@@ -1,325 +1,1182 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>George Fox University — Interactive Campus GPS Map</title>
-<style>
-  :root {
-    --navy: #112856;
-    --navy-dark: #091f3f;
-    --gold: #f68536;
-    --quad: #c3dd69;
-    --road: #f0efef;
-    --creek: #6ba2dc;
-    --visitor: #7ac143;
-    --bg: #f8f9fa;
-    --surface: #ffffff;
-    --text: #1a202c;
-    --muted: #5a6577;
-    --border: #e2e8f0;
-    --blue: #1a73e8;
-  }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body {
-    margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: #eef1f4;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: var(--text);
-  }
-  #app { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>George Fox University — Interactive Campus GPS Map</title>
 
-  /* Top Floating Search & Filter Bar */
-  .top-bar {
-    position: absolute; top: 12px; left: 12px; right: 12px; z-index: 30;
-    max-width: 480px; margin: 0 auto; pointer-events: none;
-  }
-  .search-card {
-    pointer-events: auto; background: var(--surface); border-radius: 28px;
-    box-shadow: 0 4px 18px rgba(17, 40, 86, 0.16);
-    display: flex; align-items: center; padding: 6px 12px 6px 14px; gap: 8px;
-    border: 1px solid rgba(17,40,86,0.08);
-  }
-  .brand-badge {
-    width: 32px; height: 32px; border-radius: 50%; background: var(--navy);
-    color: #fff; font-weight: 800; font-size: 16px; display: flex;
-    align-items: center; justify-content: center; flex-shrink: 0;
-  }
-  #searchInput {
-    flex: 1; border: none; outline: none; font-size: 15px; background: transparent;
-    color: var(--text); min-width: 0;
-  }
-  .icon-btn {
-    border: none; background: #f1f5f9; color: var(--navy); border-radius: 20px;
-    padding: 6px 11px; font-size: 12px; font-weight: 600; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
-  }
-  .icon-btn:active { transform: scale(0.97); }
-  .chips {
-    pointer-events: auto; display: flex; gap: 6px; overflow-x: auto;
-    padding: 8px 2px 4px; scrollbar-width: none;
-  }
-  .chips::-webkit-scrollbar { display: none; }
-  .chip {
-    background: var(--surface); border: 1px solid var(--border); color: var(--text);
-    border-radius: 18px; padding: 5px 12px; font-size: 12px; font-weight: 600;
-    white-space: nowrap; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.06);
-  }
-  .chip.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+  <!-- Google Font: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
 
-  /* Search Dropdown Results */
-  .results-dropdown {
-    pointer-events: auto; background: var(--surface); border-radius: 16px;
-    margin-top: 6px; max-height: 52vh; overflow-y: auto;
-    box-shadow: 0 10px 28px rgba(0,0,0,0.18); display: none;
-    border: 1px solid var(--border);
-  }
-  .results-dropdown.open { display: block; }
-  .res-item {
-    padding: 11px 14px; border-bottom: 1px solid #f1f5f9; display: flex;
-    align-items: center; gap: 10px; cursor: pointer;
-  }
-  .res-item:last-child { border-bottom: none; }
-  .res-item:hover { background: #f8fafc; }
-  .res-num {
-    min-width: 30px; height: 26px; border-radius: 7px; font-size: 12px;
-    font-weight: 700; color: #fff; display: flex; align-items: center;
-    justify-content: center; padding: 0 6px; flex-shrink: 0;
-  }
-  .res-meta { flex: 1; min-width: 0; }
-  .res-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .res-sub { font-size: 12px; color: var(--muted); }
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          },
+          colors: {
+            gfu: {
+              navy: '#112856',
+              dark: '#091f3f',
+              gold: '#f68536',
+              quad: '#c3dd69',
+              visitor: '#7ac143',
+              creek: '#6ba2dc',
+              blue: '#1a73e8'
+            }
+          }
+        }
+      }
+    };
+  </script>
 
-  /* Interactive Pan/Zoom Vector Map Viewport */
-  #viewport {
-    position: relative; flex: 1; width: 100%; height: 100%;
-    overflow: hidden; touch-action: none; cursor: grab; background: #ffffff;
-  }
-  #viewport.grabbing { cursor: grabbing; }
-  #mapStage {
-    position: absolute; top: 0; left: 0; transform-origin: 0 0;
-    will-change: transform;
-  }
-  #campusSvg { display: block; width: 904px; height: 1244px; user-select: none; }
+  <!-- Leaflet.js CSS & JS (L.CRS.Simple Touchscreen Pan/Pinch-Zoom Engine) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
-  /* Right Floating Controls */
-  .map-controls {
-    position: absolute; right: 12px; bottom: 165px; z-index: 25;
-    display: flex; flex-direction: column; gap: 8px;
-  }
-  .fab {
-    width: 44px; height: 44px; border-radius: 50%; background: var(--surface);
-    border: 1px solid var(--border); box-shadow: 0 3px 12px rgba(0,0,0,0.15);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px; font-weight: 700; color: var(--navy); cursor: pointer;
-  }
-  .fab.gps-active { background: var(--blue); color: #fff; border-color: var(--blue); }
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: #ffffff;
+      -webkit-tap-highlight-color: transparent;
+    }
 
-  /* GPS Status Pill */
-  .gps-pill {
-    position: absolute; left: 12px; bottom: 165px; z-index: 25;
-    background: rgba(255,255,255,0.95); border: 1px solid var(--border);
-    border-radius: 20px; padding: 6px 12px; font-size: 12px; font-weight: 600;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 6px;
-    cursor: pointer;
-  }
-  .dot-live { width: 8px; height: 8px; border-radius: 50%; background: #10b981; }
-  .dot-sim { width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; }
+    #map {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100dvh;
+      z-index: 0;
+      background-color: #ffffff;
+      touch-action: none;
+    }
 
-  /* Bottom Sheet Card */
-  .bottom-sheet {
-    position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 30;
-    max-width: 480px; margin: 0 auto; background: var(--surface);
-    border-radius: 20px; padding: 14px 16px;
-    box-shadow: 0 -2px 22px rgba(17,40,86,0.16);
-    border: 1px solid var(--border); transition: transform 0.2s ease;
-  }
-  .sheet-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-  .sheet-title { font-size: 17px; font-weight: 700; color: var(--navy); margin: 0; }
-  .sheet-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
-  .sheet-actions { display: flex; gap: 8px; margin-top: 12px; }
-  .btn-primary {
-    flex: 1; background: var(--blue); color: #fff; border: none; border-radius: 12px;
-    padding: 11px 14px; font-size: 14px; font-weight: 700; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 6px;
-  }
-  .btn-secondary {
-    background: #f1f5f9; color: var(--navy); border: none; border-radius: 12px;
-    padding: 11px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
-  }
-  .route-steps {
-    margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
-    max-height: 110px; overflow-y: auto; font-size: 13px; display: none;
-  }
-  .route-steps.open { display: block; }
-  .step-row { padding: 4px 0; display: flex; gap: 8px; color: var(--text); }
+    /* Hide scrollbar for horizontal category chips */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
 
-  /* Modal (Legend / Simulate Start / Off-Campus) */
-  .modal-backdrop {
-    position: fixed; inset: 0; background: rgba(9,31,63,0.48); z-index: 50;
-    display: none; align-items: flex-end; justify-content: center; padding: 12px;
-  }
-  .modal-backdrop.open { display: flex; }
-  .modal-card {
-    background: var(--surface); width: 100%; max-width: 480px; border-radius: 20px;
-    padding: 18px; max-height: 80vh; overflow-y: auto;
-  }
-  .modal-card h3 { margin: 0 0 10px; color: var(--navy); font-size: 17px; }
-  .legend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; }
-  .legend-item { display: flex; align-items: center; gap: 8px; }
-  .swatch { width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0; }
+    /* Slim scrollbar for dropdowns & steps */
+    .slim-scroll::-webkit-scrollbar {
+      width: 5px;
+    }
+    .slim-scroll::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
 
-  @keyframes pulseRing {
-    0% { transform: scale(0.7); opacity: 0.85; }
-    100% { transform: scale(2.2); opacity: 0; }
-  }
-  .gps-pulse { transform-box: fill-box; transform-origin: center; animation: pulseRing 2s infinite ease-out; }
-</style>
+    /* Building Number Labels Centered on Footprints */
+    .bldg-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Inter', sans-serif;
+      font-weight: 800;
+      font-size: 10px;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      pointer-events: none;
+      user-select: none;
+    }
+    .bldg-label.facility {
+      color: #ffffff;
+      text-shadow: 0 1px 1.5px rgba(9, 31, 63, 0.85);
+    }
+    .bldg-label.housing {
+      color: #112856;
+      text-shadow: 0 0 2px rgba(255, 255, 255, 0.85);
+    }
+    .bldg-label.field {
+      color: #091f3f;
+      font-size: 11px;
+      text-shadow: 0 0 3px rgba(255, 255, 255, 0.95);
+    }
+
+    /* Parking Lot Circular Badges (A–J) & Green Visitor Badges (V) */
+    .lot-badge {
+      width: 22px;
+      height: 22px;
+      border-radius: 9999px;
+      background-color: #112856;
+      color: #ffffff;
+      border: 1.8px solid #ffffff;
+      font-weight: 800;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1.5px 4px rgba(9, 31, 63, 0.38);
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+    .lot-badge:active, .lot-badge:hover {
+      transform: scale(1.18);
+    }
+
+    .visitor-badge {
+      width: 23px;
+      height: 23px;
+      border-radius: 9999px;
+      background-color: #7ac143;
+      color: #112856;
+      border: 1.8px solid #112856;
+      font-weight: 900;
+      font-size: 11.5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1.5px 4px rgba(9, 31, 63, 0.35);
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+    .visitor-badge:active, .visitor-badge:hover {
+      transform: scale(1.18);
+    }
+
+    /* Official PDF Grid Labels (A–G, 1–10) */
+    .grid-badge {
+      width: 20px;
+      height: 20px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid #cbd5e1;
+      color: #64748b;
+      font-size: 10px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    /* Pulsing Google Maps GPS Blue Dot */
+    .gps-marker-wrap {
+      position: relative;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .gps-pulse-ring {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      border-radius: 9999px;
+      background: rgba(26, 115, 232, 0.30);
+      animation: gpsPulse 2.1s infinite ease-out;
+    }
+    .gps-core-dot {
+      position: relative;
+      width: 15px;
+      height: 15px;
+      border-radius: 9999px;
+      background: #1a73e8;
+      border: 2.5px solid #ffffff;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.38);
+    }
+    @keyframes gpsPulse {
+      0% { transform: scale(0.45); opacity: 0.95; }
+      100% { transform: scale(1.55); opacity: 0; }
+    }
+
+    /* Custom Leaflet Tooltip */
+    .leaflet-tooltip.gfu-tip {
+      background: rgba(17, 40, 86, 0.96);
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+    }
+    .leaflet-tooltip-top.gfu-tip:before {
+      border-top-color: rgba(17, 40, 86, 0.96);
+    }
+
+    /* Bottom Sheet Slide Animation */
+    .sheet-panel {
+      transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease;
+    }
+
+    .leaflet-control-attribution {
+      font-size: 9px !important;
+      background: rgba(255, 255, 255, 0.82) !important;
+      color: #64748b !important;
+    }
+  </style>
 </head>
-<body>
-<div id="app">
-  <!-- Floating Search & Category Bar -->
-  <div class="top-bar">
-    <div class="search-card">
-      <div class="brand-badge">G</div>
-      <input id="searchInput" type="search" placeholder="Search 98 buildings, lots A–J, AED..." autocomplete="off" />
-      <button class="icon-btn" id="legendBtn" title="Map Legend">Legend</button>
-    </div>
-    <div class="chips" id="filterChips">
-      <button class="chip active" data-cat="all">All (111)</button>
-      <button class="chip" data-cat="facility">Facilities (1–58)</button>
-      <button class="chip" data-cat="housing">Housing (59–98)</button>
-      <button class="chip" data-cat="parking">Parking (A–J, V)</button>
-      <button class="chip" data-cat="aed">AED / Family</button>
-      <button class="chip" data-cat="offcampus">Off-Campus</button>
-    </div>
-    <div class="results-dropdown" id="resultsDropdown"></div>
+<body class="select-none">
+
+  <!-- Fullscreen Leaflet L.CRS.Simple Interactive Vector Campus Map -->
+  <div id="map"></div>
+
+  <!-- Tap-on-Map Instruction Banner (Active when setting a custom start pin) -->
+  <div id="tapPinBanner" class="hidden fixed top-36 left-1/2 -translate-x-1/2 z-30 bg-[#091f3f]/95 text-white px-4 py-2 rounded-full shadow-xl flex items-center gap-2.5 text-xs font-semibold border border-white/15 backdrop-blur-md">
+    <span class="w-2.5 h-2.5 rounded-full bg-blue-400 animate-ping"></span>
+    <span>Tap anywhere on the campus map to set your start point</span>
+    <button onclick="cancelTapPinMode()" class="ml-1 px-2.5 py-0.5 bg-white/15 hover:bg-white/25 rounded-full text-[11px]">Cancel</button>
   </div>
 
-  <!-- Interactive PDF-Exact Campus Map Viewport -->
-  <div id="viewport">
-    <div id="mapStage">
-      <svg id="campusSvg" viewBox="16 14 452 622" xmlns="http://www.w3.org/2000/svg">
-        <!-- Base Paper Background -->
+  <!-- TOP FLOATING SEARCH & FILTER HEADER -->
+  <header class="fixed top-0 left-0 right-0 z-20 pointer-events-none px-3 pt-3 sm:px-4 sm:pt-4 max-w-lg mx-auto">
+    <!-- Floating Search Pill -->
+    <div class="pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl shadow-lg border border-slate-200/90 flex items-center px-3 py-2 gap-2.5 focus-within:border-[#1a73e8] focus-within:shadow-xl transition">
+      <!-- GFU Crest / Back Button -->
+      <button id="leadingBtn" onclick="handleLeadingBtnClick()" title="Reset Campus View" class="w-9 h-9 rounded-xl bg-[#112856] text-white flex items-center justify-center font-black text-base shrink-0 shadow-xs active:scale-95 transition">
+        <span id="leadingLogo">G</span>
+        <svg id="leadingBack" class="hidden w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+
+      <!-- Search Input -->
+      <input
+        id="searchInput"
+        type="text"
+        autocomplete="off"
+        placeholder="Search 98 buildings, lots A–J, grid D5, AED..."
+        class="w-full bg-transparent text-slate-900 placeholder-slate-400 text-sm font-medium focus:outline-none select-text"
+      />
+
+      <!-- Clear Search Button -->
+      <button id="clearSearchBtn" onclick="clearSearchInput()" class="hidden p-1.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition" aria-label="Clear search">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+
+      <div class="h-5 w-[1px] bg-slate-200 shrink-0"></div>
+
+      <!-- Page 2 Off-Campus Inset Maps Button -->
+      <button onclick="openOffCampusModal()" title="Off-Campus Inset Maps (Page 2)" class="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#112856] text-xs font-bold shrink-0 transition">
+        Area Map
+      </button>
+    </div>
+
+    <!-- Autocomplete Results Dropdown -->
+    <div id="searchResults" class="hidden pointer-events-auto mt-1.5 bg-white/98 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200 max-h-[50dvh] overflow-y-auto slim-scroll divide-y divide-slate-100">
+    </div>
+
+    <!-- Horizontal Category Filter Chips -->
+    <div class="pointer-events-auto mt-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+      <button data-cat="all" onclick="setFilterCategory('all')" class="cat-chip shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold shadow-xs border transition bg-[#112856] text-white border-[#112856]">
+        All (111)
+      </button>
+      <button data-cat="facility" onclick="setFilterCategory('facility')" class="cat-chip shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold shadow-xs border transition bg-white/95 text-slate-700 border-slate-200 hover:bg-slate-50 flex items-center gap-1.5">
+        <span class="w-2.5 h-2.5 rounded-xs bg-[#112856]"></span> Facilities (1–58)
+      </button>
+      <button data-cat="housing" onclick="setFilterCategory('housing')" class="cat-chip shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold shadow-xs border transition bg-white/95 text-slate-700 border-slate-200 hover:bg-slate-50 flex items-center gap-1.5">
+        <span class="w-2.5 h-2.5 rounded-xs bg-[#f68536]"></span> Housing (59–98)
+      </button>
+      <button data-cat="parking" onclick="setFilterCategory('parking')" class="cat-chip shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold shadow-xs border transition bg-white/95 text-slate-700 border-slate-200 hover:bg-slate-50 flex items-center gap-1.5">
+        <span class="w-2.5 h-2.5 rounded-full bg-[#7ac143] border border-[#112856]"></span> Parking (A–J / V)
+      </button>
+      <button data-cat="amenity" onclick="setFilterCategory('amenity')" class="cat-chip shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold shadow-xs border transition bg-white/95 text-slate-700 border-slate-200 hover:bg-slate-50 flex items-center gap-1.5">
+        <span class="text-[#ed1c24] font-black">♥</span> AED & Family
+      </button>
+      <button data-cat="offcampus" onclick="setFilterCategory('offcampus')" class="cat-chip shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold shadow-xs border transition bg-white/95 text-slate-700 border-slate-200 hover:bg-slate-50 flex items-center gap-1.5">
+        <span class="w-2.5 h-2.5 rounded-full bg-[#112856]"></span> Off-Campus
+      </button>
+    </div>
+
+    <!-- Live GPS Status & Simulate Start Bar -->
+    <div class="pointer-events-auto mt-1 flex items-center justify-between gap-2">
+      <button onclick="openSimulateModal()" class="bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-xs rounded-full px-3 py-1 flex items-center gap-2 text-[11px] font-semibold text-slate-700 truncate hover:bg-slate-50 transition">
+        <span id="gpsIndicatorDot" class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+        <span id="gpsIndicatorText" class="truncate">Locating Newberg GPS...</span>
+      </button>
+
+      <button onclick="openSimulateModal()" class="shrink-0 bg-[#112856] hover:bg-[#091f3f] text-white shadow-md rounded-full px-3 py-1 text-[11px] font-bold flex items-center gap-1 active:scale-95 transition">
+        <span>📍 Simulate Start</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- RIGHT-SIDE FLOATING MAP CONTROLS -->
+  <aside id="rightControls" class="fixed right-3 sm:right-4 bottom-36 z-20 flex flex-col gap-2 transition-all duration-300">
+    <!-- Toggle PDF A–G / 1–10 Grid Overlay -->
+    <button id="gridToggleBtn" onclick="togglePdfGrid()" title="Toggle Official PDF Grid (A–G, 1–10)" class="w-11 h-11 rounded-2xl bg-white/95 backdrop-blur-md shadow-lg border border-slate-200 flex flex-col items-center justify-center text-slate-700 hover:text-[#112856] active:scale-95 transition">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.1" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16M6 4v16M12 4v16M18 4v16" />
+      </svg>
+      <span class="text-[8px] font-extrabold uppercase mt-0.5">Grid</span>
+    </button>
+
+    <!-- Open Official PDF Map Legend -->
+    <button onclick="openLegendModal()" title="Official Map Legend" class="w-11 h-11 rounded-2xl bg-white/95 backdrop-blur-md shadow-lg border border-slate-200 flex flex-col items-center justify-center text-slate-700 hover:text-[#112856] active:scale-95 transition">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.1" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+      </svg>
+      <span class="text-[8px] font-extrabold uppercase mt-0.5">Legend</span>
+    </button>
+
+    <!-- Recenter Full Campus -->
+    <button onclick="recenterFullCampus()" title="Overview Full Campus" class="w-11 h-11 rounded-2xl bg-white/95 backdrop-blur-md shadow-lg border border-slate-200 flex flex-col items-center justify-center text-slate-700 hover:text-[#112856] active:scale-95 transition">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.1" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+      </svg>
+      <span class="text-[8px] font-extrabold uppercase mt-0.5">Campus</span>
+    </button>
+
+    <!-- Center on User GPS Dot -->
+    <button onclick="centerOnUserPin()" title="Center on My Location" class="w-11 h-11 rounded-2xl bg-white/95 backdrop-blur-md shadow-lg border border-slate-200 flex flex-col items-center justify-center text-[#1a73e8] hover:bg-blue-50 active:scale-95 transition">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="3" />
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 2v3m0 14v3M2 12h3m14 0h3" />
+      </svg>
+      <span class="text-[8px] font-extrabold uppercase mt-0.5">My GPS</span>
+    </button>
+  </aside>
+
+  <!-- BOTTOM DESTINATION & TURN-BY-TURN NAVIGATION CARD -->
+  <section id="bottomCard" class="sheet-panel fixed bottom-3 left-3 right-3 sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-lg z-30 bg-white/98 backdrop-blur-md rounded-3xl shadow-2xl border border-slate-200 px-4 pt-2.5 pb-3.5">
+    <!-- Subtle Drag Handle -->
+    <div class="w-9 h-1 bg-slate-300 rounded-full mx-auto mb-2"></div>
+
+    <!-- Header Info Row -->
+    <div class="flex items-start justify-between gap-2.5">
+      <div class="flex items-start gap-2.5 min-w-0">
+        <div id="cardBadge" class="min-w-[40px] h-10 px-2 rounded-2xl bg-[#112856] text-white font-extrabold text-sm flex items-center justify-center shrink-0 shadow-xs">
+          41
+        </div>
+        <div class="min-w-0">
+          <h2 id="cardTitle" class="text-sm sm:text-base font-extrabold text-[#112856] leading-snug truncate">Murdock Library</h2>
+          <div id="cardSub" class="text-xs text-slate-500 mt-0.5 truncate">
+            Grid D5 • Campus Facility • AED & Mother's Room
+          </div>
+        </div>
+      </div>
+
+      <button id="clearRouteBtn" onclick="clearActiveRoute()" class="hidden px-2.5 py-1 rounded-full bg-red-50 hover:bg-red-100 text-red-600 text-[11px] font-bold shrink-0 transition">
+        End Route
+      </button>
+    </div>
+
+    <!-- Action Buttons Row -->
+    <div class="mt-2.5 grid grid-cols-5 gap-2">
+      <button onclick="routeToSelectedPlace()" class="col-span-3 bg-[#1a73e8] hover:bg-blue-700 active:scale-[0.99] text-white font-bold text-xs sm:text-sm py-2.5 px-3 rounded-2xl shadow-md shadow-blue-500/20 flex items-center justify-center gap-1.5 transition">
+        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M21.71 11.29l-9-9a.996.996 0 00-1.41 0l-9 9a.996.996 0 000 1.41l9 9c.39.39 1.02.39 1.41 0l9-9a.996.996 0 000-1.41zM14 14.5V12h-4v3H8v-4c0-.55.45-1 1-1h5V7.5l3.5 3.5-3.5 3.5z" />
+        </svg>
+        <span>Walking Directions</span>
+      </button>
+
+      <button onclick="setSelectedPlaceAsStart()" class="col-span-2 bg-slate-100 hover:bg-slate-200 active:scale-[0.99] text-slate-800 font-bold text-xs py-2.5 px-2.5 rounded-2xl flex items-center justify-center gap-1 transition">
+        <span>Set as Start</span>
+      </button>
+    </div>
+
+    <!-- Collapsible Turn-by-Turn Route Summary & Steps -->
+    <div id="routeDrawer" class="hidden mt-2.5 pt-2.5 border-t border-slate-100">
+      <div class="flex items-center justify-between gap-2 mb-1.5">
+        <div class="flex items-baseline gap-2">
+          <span id="routeTimeText" class="text-lg font-extrabold text-emerald-700">4 min</span>
+          <span id="routeDistText" class="text-xs font-semibold text-slate-500">(920 ft)</span>
+        </div>
+        <button id="toggleStepsBtn" onclick="toggleStepsVisibility()" class="text-[11px] font-bold text-[#1a73e8] hover:underline">
+          Hide Steps
+        </button>
+      </div>
+      <div class="text-[11px] text-slate-500 mb-1.5 truncate">
+        From: <strong id="routeStartLabel" class="text-slate-700">Visitor Lot V (Bauman/Ross)</strong>
+      </div>
+      <div id="routeStepsContainer" class="max-h-28 overflow-y-auto slim-scroll divide-y divide-slate-100 text-xs">
+      </div>
+    </div>
+  </section>
+
+  <!-- SIMULATE START LOCATION MODAL -->
+  <div id="simulateModal" class="hidden fixed inset-0 z-50 bg-[#091f3f]/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4" onclick="if(event.target===this) closeSimulateModal()">
+    <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 p-5 max-h-[82dvh] overflow-y-auto slim-scroll">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h3 class="text-base font-extrabold text-[#112856]">Set Your Starting Location</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Auto-tracks live phone GPS in Newberg, or test from any lot:</p>
+        </div>
+        <button onclick="closeSimulateModal()" class="p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="space-y-2">
+        <button onclick="activateRealPhoneGps()" class="w-full text-left p-3 rounded-2xl border border-blue-200 bg-blue-50/80 hover:bg-blue-100/80 flex items-center gap-3 transition">
+          <span class="w-9 h-9 rounded-xl bg-[#1a73e8] text-white font-bold flex items-center justify-center shrink-0">◎</span>
+          <div>
+            <div class="text-xs font-extrabold text-blue-950">Use Live Phone GPS</div>
+            <div class="text-[11px] text-blue-700">Real-time Newberg, OR geolocation sensor</div>
+          </div>
+        </button>
+
+        <button onclick="enableTapPinMode()" class="w-full text-left p-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100/70 flex items-center gap-3 transition">
+          <span class="w-9 h-9 rounded-xl bg-emerald-600 text-white font-bold flex items-center justify-center shrink-0">👆</span>
+          <div>
+            <div class="text-xs font-extrabold text-emerald-950">Tap Map to Drop Start Pin</div>
+            <div class="text-[11px] text-emerald-700">Tap any building, quad, or walkway on the map</div>
+          </div>
+        </button>
+
+        <div class="pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Official Visitor Parking & Campus Presets</div>
+
+        <button onclick="setSimulatedStart(171.1, 268.6, 'Visitor Lot V (Bauman / Ross)')" class="w-full text-left p-2.5 rounded-xl border border-slate-200 hover:border-[#112856] hover:bg-slate-50 flex items-center justify-between transition">
+          <div>
+            <div class="text-xs font-bold text-slate-900">Visitor Lot V — Bauman / Ross Center</div>
+            <div class="text-[11px] text-slate-500">North Quad & Stoffer Stadium • Grid C7</div>
+          </div>
+          <span class="w-6 h-6 rounded-full bg-[#7ac143] text-[#112856] border border-[#112856] font-black text-[11px] flex items-center justify-center">V</span>
+        </button>
+
+        <button onclick="setSimulatedStart(381.5, 250.8, 'Visitor Lot V (Wheeler / Le Shana)')" class="w-full text-left p-2.5 rounded-xl border border-slate-200 hover:border-[#112856] hover:bg-slate-50 flex items-center justify-between transition">
+          <div>
+            <div class="text-xs font-bold text-slate-900">Visitor Lot V — Wheeler / Le Shana</div>
+            <div class="text-[11px] text-slate-500">Miller Gym & Northeast Campus • Grid F7</div>
+          </div>
+          <span class="w-6 h-6 rounded-full bg-[#7ac143] text-[#112856] border border-[#112856] font-black text-[11px] flex items-center justify-center">V</span>
+        </button>
+
+        <button onclick="setSimulatedStart(432.1, 404.3, 'Visitor Lot V (Roberts Center)')" class="w-full text-left p-2.5 rounded-xl border border-slate-200 hover:border-[#112856] hover:bg-slate-50 flex items-center justify-between transition">
+          <div>
+            <div class="text-xs font-bold text-slate-900">Visitor Lot V — Roberts Center / Admissions</div>
+            <div class="text-[11px] text-slate-500">Admissions & Canyon Commons • Grid G4</div>
+          </div>
+          <span class="w-6 h-6 rounded-full bg-[#7ac143] text-[#112856] border border-[#112856] font-black text-[11px] flex items-center justify-center">V</span>
+        </button>
+
+        <button onclick="setSimulatedStart(44.3, 458.3, 'Visitor Lot V (Stevens / Meridian)')" class="w-full text-left p-2.5 rounded-xl border border-slate-200 hover:border-[#112856] hover:bg-slate-50 flex items-center justify-between transition">
+          <div>
+            <div class="text-xs font-bold text-slate-900">Visitor Lot V — West Meridian / Stevens</div>
+            <div class="text-[11px] text-slate-500">Southwest Academic Quad • Grid B3</div>
+          </div>
+          <span class="w-6 h-6 rounded-full bg-[#7ac143] text-[#112856] border border-[#112856] font-black text-[11px] flex items-center justify-center">V</span>
+        </button>
+
+        <button onclick="setSimulatedStart(208.2, 465.0, 'Parking Lot D (Pennington Hall)')" class="w-full text-left p-2.5 rounded-xl border border-slate-200 hover:border-[#112856] hover:bg-slate-50 flex items-center justify-between transition">
+          <div>
+            <div class="text-xs font-bold text-slate-900">Parking Lot D — Pennington Hall</div>
+            <div class="text-[11px] text-slate-500">E. Sheridan St. • Grid D3</div>
+          </div>
+          <span class="w-6 h-6 rounded-full bg-[#112856] text-white font-black text-[11px] flex items-center justify-center">D</span>
+        </button>
+
+        <button onclick="setSimulatedStart(339.0, 346.0, 'Canyon Commons (#12)')" class="w-full text-left p-2.5 rounded-xl border border-slate-200 hover:border-[#112856] hover:bg-slate-50 flex items-center justify-between transition">
+          <div>
+            <div class="text-xs font-bold text-slate-900">Canyon Commons (#12)</div>
+            <div class="text-[11px] text-slate-500">East of Crisman Crossing • Grid F5</div>
+          </div>
+          <span class="px-2 py-0.5 rounded bg-[#112856] text-white font-bold text-[10px]">#12</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- OFFICIAL PDF LEGEND MODAL -->
+  <div id="legendModal" class="hidden fixed inset-0 z-50 bg-[#091f3f]/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4" onclick="if(event.target===this) closeLegendModal()">
+    <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 p-5 max-h-[84dvh] overflow-y-auto slim-scroll">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h3 class="text-base font-extrabold text-[#112856]">Official George Fox Campus Map Key</h3>
+          <p class="text-xs text-slate-500">414 North Meridian St., Newberg, OR 97132</p>
+        </div>
+        <button onclick="closeLegendModal()" class="p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs text-slate-700">
+        <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+          <div class="font-bold text-slate-900 uppercase tracking-wider text-[10px]">Buildings & Parking</div>
+          <div class="flex items-center gap-2.5">
+            <span class="w-6 h-6 rounded-md bg-[#112856] text-white font-bold text-[10px] flex items-center justify-center shrink-0">1</span>
+            <span><strong>Campus Facilities (1–58):</strong> Academic, administrative & athletic buildings</span>
+          </div>
+          <div class="flex items-center gap-2.5">
+            <span class="w-6 h-6 rounded-md bg-[#f68536] text-[#112856] font-extrabold text-[10px] flex items-center justify-center shrink-0">59</span>
+            <span><strong>Student Housing (59–98):</strong> Residence halls, houses & apartments</span>
+          </div>
+          <div class="flex items-center gap-2.5">
+            <span class="w-6 h-6 rounded-full bg-[#112856] text-white font-extrabold text-[10px] flex items-center justify-center shrink-0">A</span>
+            <span><strong>Parking Lots (A–J):</strong> Campus permit & visitor lots</span>
+          </div>
+          <div class="flex items-center gap-2.5">
+            <span class="w-6 h-6 rounded-full bg-[#7ac143] text-[#112856] border border-[#112856] font-black text-[10px] flex items-center justify-center shrink-0">V</span>
+            <span><strong>Visitor Lots or Rows:</strong> Designated guest parking areas</span>
+          </div>
+        </div>
+
+        <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+          <div class="font-bold text-slate-900 uppercase tracking-wider text-[10px]">Safety & Family Amenities</div>
+
+          <div class="flex items-start gap-2.5">
+            <svg class="w-6 h-6 shrink-0" viewBox="0 0 24 24">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#ed1c24"/>
+              <path d="M13 7L9.5 13h2.5l-1 5 3.5-6H12l1-5z" fill="#ffffff"/>
+            </svg>
+            <div>
+              <div class="font-bold text-slate-900">Automated External Defibrillators (AED)</div>
+              <div class="text-slate-500 mt-0.5">Buildings 1, 8, 12, 17, 18, 21, 25, 27, 40, 41, 46, 50, 53, 54, 69, 79 & 91.</div>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-2.5">
+            <svg class="w-6 h-6 shrink-0" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="11" fill="#4dc6f4"/>
+              <circle cx="12" cy="7.5" r="2.3" fill="#ffffff"/>
+              <path d="M8.5 11.5h7v4h-2v3.5h-3v-3.5h-2v-4z" fill="#ffffff"/>
+            </svg>
+            <div>
+              <div class="font-bold text-slate-900">Baby Changing Stations</div>
+              <ul class="text-slate-500 mt-0.5 list-disc list-inside space-y-0.5">
+                <li>EHS (#18) third-floor women's room</li>
+                <li>Canyon Commons (#12) unisex restroom</li>
+                <li>Wheeler Gym (#56) restrooms</li>
+                <li>Roberts Center (#46) restroom</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-2.5">
+            <svg class="w-6 h-6 shrink-0" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="11" fill="#f140a9"/>
+              <circle cx="10.5" cy="7.2" r="2.1" fill="#ffffff"/>
+              <path d="M7.5 11.2c0-1.1.9-2 2-2h2c1.1 0 2 .9 2 2v3.8h-1.5v4h-3v-4H7.5v-3.8z" fill="#ffffff"/>
+              <circle cx="15.5" cy="11.5" r="1.4" fill="#ffffff"/>
+              <path d="M14 13.5h3v3.5h-3v-3.5z" fill="#ffffff"/>
+            </svg>
+            <div>
+              <div class="font-bold text-slate-900">Mother's Room</div>
+              <div class="text-slate-500 mt-0.5">Murdock Library (#41), Room 201</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE 2 OFF-CAMPUS INSET MAPS MODAL -->
+  <div id="offCampusModal" class="hidden fixed inset-0 z-50 bg-[#091f3f]/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4" onclick="if(event.target===this) closeOffCampusModal()">
+    <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 p-5 max-h-[86dvh] overflow-y-auto slim-scroll">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h3 class="text-base font-extrabold text-[#112856]">Off-Campus Facilities & Area Map (PDF Page 2)</h3>
+          <p class="text-xs text-slate-500">Tap any off-campus location to route or open driving GPS</p>
+        </div>
+        <button onclick="closeOffCampusModal()" class="p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Vector Area Overview Diagram (Page 2 Replica) -->
+      <div class="rounded-2xl border border-slate-200 bg-[#f8fafc] p-2 mb-3">
+        <svg viewBox="0 0 360 155" class="w-full h-auto block">
+          <rect x="0" y="0" width="360" height="155" fill="#f8fafc" rx="8"/>
+          <!-- Roads -->
+          <path d="M35 12 L35 142 M55 12 L55 142 M105 32 L105 142 M220 45 L220 142 M268 70 L268 142 M302 95 L302 142" stroke="#cbd5e1" stroke-width="4" fill="none"/>
+          <path d="M35 32 L105 32 M55 72 L105 72 M22 135 L115 135 M105 135 L345 42 M220 98 L315 95" stroke="#cbd5e1" stroke-width="4" fill="none"/>
+          <!-- Main Campus Box -->
+          <rect x="57" y="74" width="46" height="58" rx="4" fill="#648399"/>
+          <text x="80" y="101" text-anchor="middle" font-size="6.5" font-weight="700" fill="#ffffff">George Fox</text>
+          <text x="80" y="109" text-anchor="middle" font-size="6.5" font-weight="700" fill="#ffffff">University</text>
+          <!-- Austin Sports Complex -->
+          <rect x="58" y="16" width="14" height="10" fill="#112856"/>
+          <text x="76" y="23" font-size="6.5" font-weight="700" fill="#112856">Austin Sports Complex (½ mi N)</text>
+          <!-- Medical Sciences Bldg -->
+          <rect x="306" y="99" width="11" height="9" fill="#112856"/>
+          <text x="312" y="118" font-size="6.2" font-weight="700" fill="#112856">Medical</text>
+          <text x="312" y="125" font-size="6.2" font-weight="700" fill="#112856">Sciences Bldg.</text>
+          <text x="175" y="114" font-size="5.5" font-weight="700" fill="#475569" transform="rotate(-21 175 114)">PORTLAND RD. / 99W</text>
+        </svg>
+      </div>
+
+      <div class="space-y-2.5 text-xs">
+        <div class="p-3 rounded-2xl border border-slate-200 flex items-center justify-between gap-3">
+          <div>
+            <div class="font-extrabold text-[#112856]">Austin Sports Complex</div>
+            <div class="text-slate-500 mt-0.5">½ mile north of campus on Center St. & Crestview Dr. (soccer, lacrosse, tennis, track & field)</div>
+          </div>
+          <div class="flex flex-col gap-1.5 shrink-0">
+            <button onclick="closeOffCampusModal(); selectPlaceById('off1');" class="px-3 py-1.5 rounded-xl bg-[#112856] text-white font-bold text-[11px]">Campus Route</button>
+            <a href="https://www.google.com/maps/dir/?api=1&destination=45.3138,-122.9702" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-xl bg-blue-50 text-[#1a73e8] font-bold text-[11px] text-center">Google Maps</a>
+          </div>
+        </div>
+
+        <div class="p-3 rounded-2xl border border-slate-200 flex items-center justify-between gap-3">
+          <div>
+            <div class="font-extrabold text-[#112856]">George Fox Medical Sciences Building</div>
+            <div class="text-slate-500 mt-0.5">1.5 miles east at Hayes St. & Werth Blvd. (near Newberg Hospital). Park only in designated lot.</div>
+          </div>
+          <div class="flex flex-col gap-1.5 shrink-0">
+            <button onclick="closeOffCampusModal(); selectPlaceById('off2');" class="px-3 py-1.5 rounded-xl bg-[#112856] text-white font-bold text-[11px]">Campus Route</button>
+            <a href="https://www.google.com/maps/dir/?api=1&destination=45.3082,-122.9368" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-xl bg-blue-50 text-[#1a73e8] font-bold text-[11px] text-center">Google Maps</a>
+          </div>
+        </div>
+
+        <div class="p-3 rounded-2xl border border-slate-200 flex items-center justify-between gap-3">
+          <div>
+            <div class="font-extrabold text-[#112856]">George Fox Portland Center</div>
+            <div class="text-slate-500 mt-0.5">12753 S.W. 68th Ave., Portland, OR 97223 (AED & Handicap Parking on site)</div>
+          </div>
+          <div class="flex flex-col gap-1.5 shrink-0">
+            <button onclick="closeOffCampusModal(); selectPlaceById('off3');" class="px-3 py-1.5 rounded-xl bg-[#112856] text-white font-bold text-[11px]">Campus Route</button>
+            <a href="https://www.google.com/maps/dir/?api=1&destination=45.4276,-122.7471" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-xl bg-blue-50 text-[#1a73e8] font-bold text-[11px] text-center">Google Maps</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Pill -->
+  <div id="toastBanner" class="hidden fixed bottom-36 left-1/2 -translate-x-1/2 z-50 bg-[#091f3f]/95 text-white text-xs font-semibold px-4 py-2 rounded-full shadow-xl border border-white/10">
+  </div>
+
+  <script>
+    /**
+     * ============================================================================
+     * 1. COMPLETE DATASET: ALL 98 BUILDINGS, PARKING LOTS A–J/V & OFF-CAMPUS SITES
+     *    Exact PDF Coordinates (viewBox: x 16..468, y 14..636)
+     * ============================================================================
+     */
+    const PLACES = [
+      // --- CAMPUS FACILITIES (1–58) IN GEORGE FOX NAVY (#112856) ---
+      { id: '1', num: '1', name: 'Academic Resource Center', cat: 'facility', grid: 'D4', x: 220.3, y: 385.3, w: 18, h: 14, aed: true },
+      { id: '2', num: '2', name: 'Administrative Media Production', cat: 'facility', grid: 'B6', x: 81.3, y: 301.5, w: 13, h: 10 },
+      { id: '3', num: '3', name: 'Alumni Plaza', cat: 'facility', grid: 'D6', x: 205.2, y: 310.4, w: 9, h: 9 },
+      { id: '4', num: '4', name: 'Amphitheater', cat: 'facility', grid: 'E6', x: 293.0, y: 302.0, w: 24, h: 18, isAmphitheater: true },
+      { id: '5', num: '5', name: 'Armstrong House', cat: 'facility', grid: 'B2', x: 103.6, y: 494.3, w: 9, h: 9 },
+      { id: '6', num: '6', name: 'Art & Cinematic Arts Building', cat: 'facility', grid: 'D3', x: 227.9, y: 442.0, w: 19, h: 22 },
+      { id: '7', num: '7', name: 'Barclay House (SpiL/GFD)', cat: 'facility', grid: 'F6', x: 342.6, y: 299.0, w: 8, h: 12 },
+      { id: '8', num: '8', name: 'Bauman Auditorium', cat: 'facility', grid: 'C6', x: 164.4, y: 292.0, w: 22, h: 28, aed: true },
+      { id: '9', num: '9', name: 'Beals House', cat: 'facility', grid: 'D2', x: 202.0, y: 526.2, w: 9, h: 12 },
+      { id: '10', num: '10', name: 'Bruin Community Pantry', cat: 'facility', grid: 'F3', x: 393.4, y: 424.5, w: 8, h: 8 },
+      { id: '11', num: '11', name: 'Bruin Store', cat: 'facility', grid: 'D4', x: 224.0, y: 403.7, w: 14, h: 12 },
+      { id: '12', num: '12', name: 'Canyon Commons', cat: 'facility', grid: 'F5', x: 339.0, y: 346.0, w: 20, h: 38, aed: true, baby: 'Canyon Commons unisex restroom' },
+      { id: '13', num: '13', name: 'Centennial Tower', cat: 'facility', grid: 'C4', x: 174.0, y: 395.4, w: 7, h: 7 },
+      { id: '14', num: '14', name: 'Center Street House', cat: 'facility', grid: 'B6', x: 101.0, y: 296.0, w: 8, h: 13 },
+      { id: '15', num: '15', name: 'Chapel', cat: 'facility', grid: 'D5', x: 249.9, y: 343.0, w: 24, h: 12 },
+      { id: '16', num: '16', name: 'Costume Studio', cat: 'facility', grid: 'C7', x: 125.2, y: 258.4, w: 11, h: 8 },
+      { id: '17', num: '17', name: 'Duke Athletic Center', cat: 'facility', grid: 'D7', x: 182.0, y: 216.5, w: 24, h: 11, aed: true },
+      { id: '18', num: '18', name: 'Edwards-Holman Science Center', cat: 'facility', grid: 'C5', x: 134.3, y: 370.8, w: 18, h: 24, aed: true, baby: "EHS 3rd-floor women's room" },
+      { id: '19', num: '19', name: 'Engineering Maker Hub', cat: 'facility', grid: 'D4', x: 207.7, y: 421.4, w: 16, h: 11 },
+      { id: '20', num: '20', name: 'Fry House', cat: 'facility', grid: 'D2', x: 241.3, y: 497.4, w: 8, h: 9 },
+      { id: '21', num: '21', name: 'Hadlock Student Center', cat: 'facility', grid: 'F4', x: 341.4, y: 414.0, w: 24, h: 34, aed: true },
+      { id: '22', num: '22', name: 'Health and Counseling Center', cat: 'facility', grid: 'C2', x: 186.4, y: 526.8, w: 13, h: 12 },
+      { id: '23', num: '23', name: 'Hiebert House (Campus Public Safety)', cat: 'facility', grid: 'D2', x: 266.5, y: 491.4, w: 11, h: 8 },
+      { id: '24', num: '24', name: 'Hodgin Studio', cat: 'facility', grid: 'D2', x: 216.0, y: 507.0, w: 10, h: 5 },
+      { id: '25', num: '25', name: 'Hoover Academic Building', cat: 'facility', grid: 'C4', x: 130.0, y: 399.5, w: 18, h: 18, aed: true },
+      { id: '26', num: '26', name: 'Intercultural Resource Center', cat: 'facility', grid: 'D2', x: 203.2, y: 494.8, w: 12, h: 8 },
+      { id: '27', num: '27', name: 'Klages Center', cat: 'facility', grid: 'D4', x: 208.5, y: 408.3, w: 22, h: 16, aed: true },
+      { id: '28', num: '28', name: 'Lemmons Center', cat: 'facility', grid: 'B5', x: 117.0, y: 331.0, w: 44, h: 18, isOctagon: true },
+      { id: '29', num: '29', name: 'Lemmons Family Field', cat: 'facility', grid: 'D6', x: 227.0, y: 264.0, w: 26, h: 68, isField: true },
+      { id: '30', num: '30', name: 'Lindgren Gallery', cat: 'facility', grid: 'C6', x: 175.9, y: 296.3, w: 14, h: 16 },
+      { id: '31', num: '31', name: 'Mail Services (Room 120)', cat: 'facility', grid: 'F4', x: 390.8, y: 394.3, w: 14, h: 16 },
+      { id: '32', num: '32', name: "Maker's Market", cat: 'facility', grid: 'D4', x: 218.1, y: 413.3, w: 14, h: 11 },
+      { id: '33', num: '33', name: 'Margaret Lemmons House', cat: 'facility', grid: 'B2', x: 81.6, y: 495.6, w: 10, h: 10 },
+      { id: '34', num: '34', name: 'Meridian Street House (HR)', cat: 'facility', grid: 'B2', x: 81.9, y: 517.2, w: 12, h: 8 },
+      { id: '35', num: '35', name: 'Millage Building', cat: 'facility', grid: 'F2', x: 393.8, y: 488.6, w: 14, h: 16 },
+      { id: '36', num: '36', name: 'Millage Memorial Rose Garden', cat: 'facility', grid: 'C5', x: 156.0, y: 346.0, w: 16, h: 16, isField: true },
+      { id: '37', num: '37', name: 'Miller Gym', cat: 'facility', grid: 'E7', x: 276.0, y: 244.0, w: 28, h: 24 },
+      { id: '38', num: '38', name: 'Minthorne Gallery', cat: 'facility', grid: 'B4', x: 119.4, y: 413.0, w: 14, h: 14 },
+      { id: '39', num: '39', name: 'Minthorn Hall', cat: 'facility', grid: 'C5', x: 191.6, y: 340.5, w: 14, h: 11 },
+      { id: '40', num: '40', name: 'Morse Athletic Fields', cat: 'facility', grid: 'F8', x: 368.0, y: 152.0, w: 42, h: 48, isField: true, aed: true },
+      { id: '41', num: '41', name: 'Murdock Library', cat: 'facility', grid: 'D5', x: 210.7, y: 364.6, w: 20, h: 24, aed: true, mother: 'Murdock Library Room 201' },
+      { id: '42', num: '42', name: 'Nash House', cat: 'facility', grid: 'B7', x: 79.4, y: 215.7, w: 10, h: 11 },
+      { id: '43', num: '43', name: 'Pavilion', cat: 'facility', grid: 'E3', x: 313.1, y: 466.8, w: 10, h: 10 },
+      { id: '44', num: '44', name: 'Pennington House (Honors)', cat: 'facility', grid: 'C2', x: 126.8, y: 497.8, w: 12, h: 12 },
+      { id: '45', num: '45', name: 'River Street House (Marcom)', cat: 'facility', grid: 'C3', x: 151.0, y: 464.9, w: 16, h: 11 },
+      { id: '46', num: '46', name: 'Roberts Center', cat: 'facility', grid: 'F5', x: 396.0, y: 366.0, w: 34, h: 46, aed: true, baby: 'Roberts restroom' },
+      { id: '47', num: '47', name: 'Ron Gregory Atrium', cat: 'facility', grid: 'C4', x: 125.6, y: 360.4, w: 14, h: 14 },
+      { id: '48', num: '48', name: 'Ross Center', cat: 'facility', grid: 'C6', x: 188.5, y: 296.4, w: 14, h: 16 },
+      { id: '49', num: '49', name: 'Senior Design Studio', cat: 'facility', grid: 'E4', x: 279.6, y: 418.5, w: 9, h: 9 },
+      { id: '50', num: '50', name: 'Stevens Center', cat: 'facility', grid: 'C3', x: 144.5, y: 438.1, w: 24, h: 26, aed: true },
+      { id: '51', num: '51', name: 'Stoffer Family Stadium', cat: 'facility', grid: 'D7', x: 197.0, y: 264.0, w: 9, h: 34 },
+      { id: '52', num: '52', name: 'Student Life Offices', cat: 'facility', grid: 'F4', x: 354.1, y: 422.3, w: 18, h: 24 },
+      { id: '53', num: '53', name: 'Thomas Center (Plant Services)', cat: 'facility', grid: 'G10', x: 408.0, y: 44.0, w: 26, h: 30, aed: true },
+      { id: '54', num: '54', name: 'Thornburg House (Academic Affairs)', cat: 'facility', grid: 'C2', x: 147.6, y: 496.0, w: 14, h: 10, aed: true },
+      { id: '55', num: '55', name: 'Vermillion St. House', cat: 'facility', grid: 'B6', x: 106.0, y: 268.4, w: 8, h: 9 },
+      { id: '56', num: '56', name: 'Wheeler Sports Center', cat: 'facility', grid: 'E6', x: 277.2, y: 272.7, w: 24, h: 22, baby: 'Wheeler Gym restrooms' },
+      { id: '57', num: '57', name: 'Wood-Mar Hall', cat: 'facility', grid: 'B4', x: 116.3, y: 374.0, w: 13, h: 18 },
+      { id: '58', num: '58', name: 'Wright House (MSW)', cat: 'facility', grid: 'G5', x: 439.5, y: 337.0, w: 12, h: 9 },
+
+      // --- STUDENT HOUSING (59–98) IN GEORGE FOX GOLD (#f68536) ---
+      { id: '59', num: '59', name: 'Anderson House', cat: 'housing', grid: 'B2', x: 104.4, y: 506.4, w: 9, h: 9 },
+      { id: '60', num: '60', name: 'Beebe Residence Hall', cat: 'housing', grid: 'E3', x: 276.4, y: 472.7, w: 10, h: 14 },
+      { id: '61', num: '61', name: 'Brandt Residence Hall', cat: 'housing', grid: 'G6', x: 419.1, y: 299.7, w: 42, h: 11 },
+      { id: '62', num: '62', name: 'Campbell House', cat: 'housing', grid: 'B6', x: 81.3, y: 267.5, w: 9, h: 9 },
+      { id: '63', num: '63', name: 'Carey Residence Hall', cat: 'housing', grid: 'E3', x: 289.6, y: 466.3, w: 10, h: 16 },
+      { id: '64', num: '64', name: 'Chapman House', cat: 'housing', grid: 'D1', x: 221.2, y: 552.8, w: 8, h: 8 },
+      { id: '65', num: '65', name: 'Cole House', cat: 'housing', grid: 'G10', x: 462.0, y: 35.0, w: 8, h: 10 },
+      { id: '66', num: '66', name: 'Edwards Residence Hall', cat: 'housing', grid: 'D4', x: 257.6, y: 398.3, w: 12, h: 34 },
+      { id: '67', num: '67', name: 'Fell House', cat: 'housing', grid: 'E1', x: 264.2, y: 553.1, w: 8, h: 8 },
+      { id: '68', num: '68', name: 'Fulton Street House', cat: 'housing', grid: 'C7', x: 125.9, y: 215.7, w: 11, h: 13 },
+      { id: '69', num: '69', name: 'Gulley Residence Hall', cat: 'housing', grid: 'F6', x: 372.0, y: 300.5, w: 24, h: 12, aed: true },
+      { id: '70', num: '70', name: 'Hancock Street House', cat: 'housing', grid: 'C1', x: 194.0, y: 552.8, w: 8, h: 8 },
+      { id: '71', num: '71', name: 'Hartley House', cat: 'housing', grid: 'B7', x: 81.7, y: 246.3, w: 12, h: 8 },
+      { id: '72', num: '72', name: 'Hester House', cat: 'housing', grid: 'C2', x: 179.7, y: 504.4, w: 9, h: 8 },
+      { id: '73', num: '73', name: 'Hobson Residence Hall', cat: 'housing', grid: 'F3', x: 346.8, y: 465.3, w: 10, h: 24 },
+      { id: '74', num: '74', name: 'Hodgin House', cat: 'housing', grid: 'D2', x: 218.7, y: 498.2, w: 9, h: 9 },
+      { id: '75', num: '75', name: 'Holtan House', cat: 'housing', grid: 'G10', x: 436.9, y: 54.3, w: 12, h: 10 },
+      { id: '76', num: '76', name: 'Hoskins House', cat: 'housing', grid: 'C2', x: 180.5, y: 494.3, w: 10, h: 8 },
+      { id: '77', num: '77', name: 'Kelsey House', cat: 'housing', grid: 'B6', x: 126.5, y: 279.8, w: 9, h: 12 },
+      { id: '78', num: '78', name: 'Lamm Duplex', cat: 'housing', grid: 'D2', x: 217.8, y: 524.8, w: 11, h: 14 },
+      { id: '79', num: '79', name: 'Le Shana Residence Hall', cat: 'housing', grid: 'F6', x: 385.0, y: 264.4, w: 34, h: 12, aed: true },
+      { id: '80', num: '80', name: 'Lewis Apartments', cat: 'housing', grid: 'F3', x: 386.0, y: 436.7, w: 22, h: 18 },
+      { id: '81', num: '81', name: 'Macy Residence Hall', cat: 'housing', grid: 'F3', x: 380.7, y: 465.8, w: 10, h: 24 },
+      { id: '82', num: '82', name: 'McConaughey House', cat: 'housing', grid: 'A2', x: 24.0, y: 495.5, w: 9, h: 9 },
+      { id: '83', num: '83', name: 'McGrew House', cat: 'housing', grid: 'D2', x: 242.3, y: 525.3, w: 9, h: 14 },
+      { id: '84', num: '84', name: 'Newlin Residence Hall', cat: 'housing', grid: 'G6', x: 430.3, y: 263.5, w: 26, h: 12 },
+      { id: '85', num: '85', name: 'Parker Duplex', cat: 'housing', grid: 'D2', x: 231.7, y: 504.3, w: 9, h: 11 },
+      { id: '86', num: '86', name: 'Pennington Residence Hall', cat: 'housing', grid: 'C3', x: 192.0, y: 445.5, w: 28, h: 14 },
+      { id: '87', num: '87', name: 'Riley House', cat: 'housing', grid: 'D1', x: 246.0, y: 554.7, w: 8, h: 8 },
+      { id: '88', num: '88', name: 'Roy Apartments', cat: 'housing', grid: 'C6', x: 134.5, y: 298.8, w: 10, h: 14 },
+      { id: '89', num: '89', name: 'Rutherford Apartments', cat: 'housing', grid: 'A2', x: 45.5, y: 513.9, w: 13, h: 8 },
+      { id: '90', num: '90', name: 'Schomburg House', cat: 'housing', grid: 'B6', x: 81.2, y: 278.2, w: 9, h: 10 },
+      { id: '91', num: '91', name: 'Sutton Residence Hall', cat: 'housing', grid: 'F3', x: 364.0, y: 465.5, w: 22, h: 14, aed: true },
+      { id: '92', num: '92', name: 'Villa House', cat: 'housing', grid: 'B2', x: 93.5, y: 496.0, w: 9, h: 9 },
+      { id: '93', num: '93', name: 'Weesner House', cat: 'housing', grid: 'E2', x: 266.8, y: 518.9, w: 12, h: 8 },
+      { id: '94', num: '94', name: 'Weesner Village', cat: 'housing', grid: 'E3', x: 266.0, y: 442.5, w: 11, h: 28 },
+      { id: '95', num: '95', name: 'Wilder House', cat: 'housing', grid: 'F2', x: 349.1, y: 513.4, w: 10, h: 14 },
+      { id: '96', num: '96', name: 'Willcuts Residence Hall', cat: 'housing', grid: 'E3', x: 281.8, y: 483.5, w: 18, h: 9 },
+      { id: '97', num: '97', name: 'Winters Apartments', cat: 'housing', grid: 'C2', x: 149.2, y: 520.0, w: 18, h: 18 },
+      { id: '98', num: '98', name: 'Woolman Apartments', cat: 'housing', grid: 'D1', x: 204.0, y: 568.0, w: 24, h: 16 },
+
+      // --- PARKING LOTS (A–J) ---
+      { id: 'lotA', num: 'A', name: 'Bauman/Ross Center Parking Lot A', cat: 'parking', grid: 'C7', x: 160.8, y: 248.0, visitor: true },
+      { id: 'lotB', num: 'B', name: 'Wheeler/Le Shana Parking Lot B', cat: 'parking', grid: 'F7', x: 373.8, y: 226.0, visitor: true },
+      { id: 'lotC', num: 'C', name: 'Hoover/Wood-Mar Parking Lot C', cat: 'parking', grid: 'B4', x: 88.0, y: 396.0 },
+      { id: 'lotD', num: 'D', name: 'Pennington Hall Parking Lot D', cat: 'parking', grid: 'D3', x: 208.2, y: 465.0 },
+      { id: 'lotE', num: 'E', name: 'Stevens Center Parking Lot E', cat: 'parking', grid: 'B3', x: 94.0, y: 458.0, visitor: true },
+      { id: 'lotF', num: 'F', name: 'Roberts Center Parking Lot F', cat: 'parking', grid: 'G4', x: 435.0, y: 365.0, visitor: true },
+      { id: 'lotG', num: 'G', name: 'Hobson/Macy/Sutton/Lewis Lot G', cat: 'parking', grid: 'G3', x: 418.0, y: 440.0 },
+      { id: 'lotH', num: 'H', name: 'North Street Lot H', cat: 'parking', grid: 'G5', x: 403.0, y: 322.5 },
+      { id: 'lotI', num: 'I', name: 'Morse Parking Lot I', cat: 'parking', grid: 'G8', x: 421.0, y: 135.0 },
+      { id: 'lotJ', num: 'J', name: 'Millage Parking Lot J', cat: 'parking', grid: 'G2', x: 415.0, y: 503.0 },
+
+      // --- PAGE 2 OFF-CAMPUS FACILITIES ---
+      { id: 'off1', num: 'OFF', name: 'Austin Sports Complex (½ mi North on Center St.)', cat: 'offcampus', grid: 'North', x: 117.0, y: 185.0, lat: 45.3138, lng: -122.9702 },
+      { id: 'off2', num: 'OFF', name: 'George Fox Medical Sciences Bldg. (Hayes & Werth)', cat: 'offcampus', grid: 'East', x: 452.0, y: 512.0, lat: 45.3082, lng: -122.9368 },
+      { id: 'off3', num: 'OFF', name: 'George Fox Portland Center (12753 SW 68th Ave)', cat: 'offcampus', grid: 'Tigard', x: 452.0, y: 512.0, lat: 45.4276, lng: -122.7471 }
+    ];
+
+    /**
+     * ============================================================================
+     * 2. CAMPUS PEDESTRIAN & STREET GRAPH (DIJKSTRA SHORTEST-PATH ENGINE)
+     * ============================================================================
+     */
+    const GRAPH_NODES = {
+      n_mer_ful:  { x: 64, y: 205, label: 'N. Meridian St. & E. Fulton St.' },
+      n_cen_ful:  { x: 117, y: 205, label: 'N. Center St. & E. Fulton St.' },
+      n_sta_ful:  { x: 200, y: 205, label: 'E. Fulton St. near Duke & Stadium' },
+      n_whe_ful:  { x: 275, y: 205, label: 'E. Fulton St. near Miller Gym' },
+      n_lotb_ful: { x: 374, y: 205, label: 'E. Fulton St. & Lot B' },
+      n_vil_ful:  { x: 452, y: 205, label: 'N. Villa Rd. & E. Fulton St.' },
+
+      n_mer_ver:  { x: 64, y: 257, label: 'N. Meridian St. & E. Vermillion St.' },
+      n_cen_ver:  { x: 117, y: 257, label: 'N. Center St. & E. Vermillion St.' },
+      n_lota:     { x: 161, y: 257, label: 'Lot A & Visitor Parking' },
+
+      n_mer_nor:  { x: 64, y: 314, label: 'N. Meridian St. & E. North St.' },
+      n_cen_nor:  { x: 117, y: 314, label: 'N. Center St. & E. North St.' },
+      n_bau_nor:  { x: 176, y: 314, label: 'Bauman & Ross Plaza' },
+      n_sta_s:    { x: 215, y: 322, label: 'Alumni Plaza & South Stadium Walk' },
+      n_whe_w:    { x: 274, y: 266, label: 'Wheeler Sports Center West Plaza' },
+      n_whe_e:    { x: 360, y: 246, label: 'East End of Wheeler Bridge' },
+
+      n_vil_nor:  { x: 452, y: 314, label: 'N. Villa Rd. & E. North St.' },
+      n_loth:     { x: 403, y: 314, label: 'E. North St. & Lot H' },
+      n_les_s:    { x: 374, y: 286, label: 'Le Shana & Gulley Walkway' },
+
+      n_mer_mid:  { x: 64, y: 368, label: 'N. Meridian St. near Wood-Mar' },
+      n_cen_mid:  { x: 117, y: 368, label: 'EHS & Wood-Mar Walkway' },
+      n_quad_nw:  { x: 164, y: 368, label: 'Rose Garden & North Quad Path' },
+      n_mur_w:    { x: 200, y: 368, label: 'Murdock Library Plaza' },
+      n_cha_s:    { x: 255, y: 368, label: 'Chapel & East Quad Path' },
+      n_cri_w:    { x: 274, y: 373, label: 'West Approach to Crisman Crossing' },
+      n_cri_e:    { x: 325, y: 377, label: 'East Approach to Crisman Crossing' },
+      n_can_s:    { x: 358, y: 377, label: 'Canyon Commons & Roberts Plaza' },
+      n_rob_w:    { x: 382, y: 377, label: 'Roberts Center West Entrance' },
+      n_vil_mid:  { x: 452, y: 377, label: 'N. Villa Rd. & Lot F' },
+
+      n_mer_she:  { x: 64, y: 415, label: 'N. Meridian St. & E. Sherman St.' },
+      n_cen_she:  { x: 117, y: 415, label: 'Hoover & Stevens Walkway' },
+      n_quad_sw:  { x: 164, y: 424, label: 'Centennial Tower & South Quad Path' },
+      n_kla_s:    { x: 215, y: 424, label: 'Klages Center & Bruin Store Plaza' },
+      n_edw_s:    { x: 255, y: 424, label: 'Edwards Hall & Ravine Trail' },
+      n_had_w:    { x: 326, y: 424, label: 'Hadlock Student Center Walkway' },
+      n_had_e:    { x: 378, y: 424, label: 'Student Life & Lewis Walkway' },
+      n_vil_she:  { x: 452, y: 415, label: 'N. Villa Rd. & E. Sherman St.' },
+
+      n_mer_shd:  { x: 64, y: 477, label: 'N. Meridian St. & E. Sheridan St.' },
+      n_cen_shd:  { x: 117, y: 477, label: 'N. Center St. & E. Sheridan St.' },
+      n_riv_shd:  { x: 167, y: 477, label: 'N. River St. & E. Sheridan St.' },
+      n_lotd:     { x: 208, y: 477, label: 'E. Sheridan St. & Lot D' },
+      n_car_shd:  { x: 257, y: 477, label: 'Carlton Way & E. Sheridan St.' },
+      n_hob_n:    { x: 345, y: 456, label: 'Hobson & Sutton Courtyard' },
+      n_vil_lotg: { x: 452, y: 445, label: 'N. Villa Rd. & Lot G' },
+      n_vil_lotj: { x: 452, y: 512, label: 'N. Villa Rd. & Hwy 99W' },
+
+      n_cen_han:  { x: 117, y: 542, label: 'N. Center St. & E. Hancock St.' },
+      n_riv_han:  { x: 167, y: 542, label: 'N. River St. & E. Hancock St.' },
+      n_car_han:  { x: 257, y: 542, label: 'Carlton Way & E. Hancock St.' },
+      n_woo_s:    { x: 205, y: 565, label: 'Woolman Apartments Path' },
+      n_mor_s:    { x: 421, y: 196, label: 'Morse Athletic Fields South Path' },
+      n_mor_n:    { x: 421, y: 70,  label: 'Thomas Center & Morse North Path' }
+    };
+
+    const GRAPH_EDGES = [
+      ['n_mer_ful', 'n_cen_ful'], ['n_cen_ful', 'n_sta_ful'], ['n_sta_ful', 'n_whe_ful'], ['n_whe_ful', 'n_lotb_ful'], ['n_lotb_ful', 'n_vil_ful'],
+      ['n_lotb_ful', 'n_mor_s'], ['n_mor_s', 'n_mor_n'], ['n_vil_ful', 'n_vil_nor'], ['n_vil_nor', 'n_vil_mid'], ['n_vil_mid', 'n_vil_she'], ['n_vil_she', 'n_vil_lotg'], ['n_vil_lotg', 'n_vil_lotj'],
+      ['n_mer_ful', 'n_mer_ver'], ['n_mer_ver', 'n_mer_nor'], ['n_mer_nor', 'n_mer_mid'], ['n_mer_mid', 'n_mer_she'], ['n_mer_she', 'n_mer_shd'],
+      ['n_cen_ful', 'n_cen_ver'], ['n_cen_ver', 'n_cen_nor'], ['n_cen_nor', 'n_cen_mid'], ['n_cen_mid', 'n_cen_she'], ['n_cen_she', 'n_cen_shd'], ['n_cen_shd', 'n_cen_han'],
+      ['n_mer_ver', 'n_cen_ver'], ['n_cen_ver', 'n_lota'], ['n_lota', 'n_bau_nor'],
+      ['n_mer_nor', 'n_cen_nor'], ['n_cen_nor', 'n_bau_nor'], ['n_bau_nor', 'n_sta_s'], ['n_sta_s', 'n_whe_w'], ['n_whe_ful', 'n_whe_w'],
+      ['n_whe_w', 'n_whe_e'], ['n_whe_e', 'n_les_s'], ['n_les_s', 'n_loth'], ['n_loth', 'n_vil_nor'], ['n_lotb_ful', 'n_whe_e'],
+      ['n_mer_mid', 'n_cen_mid'], ['n_cen_mid', 'n_quad_nw'], ['n_quad_nw', 'n_mur_w'], ['n_mur_w', 'n_cha_s'], ['n_cha_s', 'n_cri_w'],
+      ['n_sta_s', 'n_cha_s'], ['n_cri_w', 'n_cri_e'], ['n_cri_e', 'n_can_s'], ['n_can_s', 'n_rob_w'], ['n_rob_w', 'n_vil_mid'], ['n_loth', 'n_can_s'],
+      ['n_mer_she', 'n_cen_she'], ['n_cen_she', 'n_quad_sw'], ['n_quad_nw', 'n_quad_sw'], ['n_quad_sw', 'n_kla_s'], ['n_mur_w', 'n_kla_s'], ['n_kla_s', 'n_edw_s'], ['n_cha_s', 'n_edw_s'],
+      ['n_can_s', 'n_had_w'], ['n_had_w', 'n_had_e'], ['n_had_e', 'n_vil_she'], ['n_had_w', 'n_hob_n'], ['n_hob_n', 'n_vil_lotg'],
+      ['n_mer_shd', 'n_cen_shd'], ['n_cen_shd', 'n_riv_shd'], ['n_riv_shd', 'n_lotd'], ['n_lotd', 'n_car_shd'], ['n_quad_sw', 'n_riv_shd'], ['n_edw_s', 'n_car_shd'],
+      ['n_riv_shd', 'n_riv_han'], ['n_car_shd', 'n_car_han'], ['n_cen_han', 'n_riv_han'], ['n_riv_han', 'n_car_han'], ['n_riv_han', 'n_woo_s'], ['n_car_han', 'n_woo_s']
+    ];
+
+    /**
+     * ============================================================================
+     * 3. REAL-WORLD NEWBERG GPS <-> PDF COORDINATE CALIBRATION
+     *    - PDF (x, y) <-> Leaflet L.CRS.Simple [lat, lng] = [-y, x]
+     * ============================================================================
+     */
+    const PDF_BOUNDS = [[-636, 16], [-14, 468]];
+    const CAMPUS_VIEW_BOUNDS = [[-595, 42], [-192, 462]];
+
+    function pdfToLatLng(x, y) {
+      return [-y, x];
+    }
+
+    function latLngToPdf(lat, lng) {
+      const x = 64 + ((lng - (-122.97185)) / 0.00850) * 388;
+      const y = 205 + ((45.30755 - lat) / 0.00420) * 210;
+      return {
+        x: Math.max(20, Math.min(464, x)),
+        y: Math.max(20, Math.min(628, y))
+      };
+    }
+
+    /**
+     * ============================================================================
+     * 4. APPLICATION STATE & LEAFLET L.CRS.SIMPLE INITIALIZATION
+     * ============================================================================
+     */
+    let map;
+    let pdfGridLayer = L.layerGroup();
+    let buildingsLayer = L.layerGroup();
+    let lotsAndIconsLayer = L.layerGroup();
+    let routeLayer = L.layerGroup();
+    let userGpsLayer = L.layerGroup();
+
+    let isGridVisible = false;
+    let activeFilterCat = 'all';
+    let selectedPlace = PLACES.find(p => p.id === '41'); // Default: Murdock Library (#41)
+    let activeRoutePlace = null;
+    let isStepsExpanded = true;
+    let isTapPinMode = false;
+
+    let userLocation = {
+      x: 171.1,
+      y: 268.6,
+      label: 'Visitor Lot V (Bauman / Ross)',
+      isLiveGps: false,
+      accuracyMeters: 12
+    };
+    let liveNewbergGps = null;
+
+    window.onload = function () {
+      try {
+        initLeafletMap();
+        buildOfficialPdfSvgOverlay();
+        buildPdfGridLayer();
+        renderBuildingsAndIcons();
+        renderUserGpsMarker();
+        updateDestinationCard(selectedPlace);
+        setupSearchListeners();
+        startNewbergGeolocation();
+      } catch (err) {
+        console.error('Campus map error:', err);
+        showToast('Error loading campus map.');
+      }
+    };
+
+    function initLeafletMap() {
+      map = L.map('map', {
+        crs: L.CRS.Simple,
+        minZoom: -0.5,
+        maxZoom: 3.5,
+        zoomSnap: 0.25,
+        zoomDelta: 0.5,
+        tap: true,
+        tapTolerance: 15,
+        bounceAtZoomLimits: false,
+        maxBounds: [[-670, -15], [15, 505]],
+        maxBoundsViscosity: 0.85,
+        zoomControl: false,
+        attributionControl: true
+      });
+
+      map.attributionControl.setPrefix('George Fox University • Official Vector GPS Map');
+      map.fitBounds(CAMPUS_VIEW_BOUNDS);
+
+      buildingsLayer.addTo(map);
+      lotsAndIconsLayer.addTo(map);
+      routeLayer.addTo(map);
+      userGpsLayer.addTo(map);
+
+      map.on('click', function (e) {
+        if (isTapPinMode) {
+          const clickedX = Math.max(20, Math.min(464, e.latlng.lng));
+          const clickedY = Math.max(20, Math.min(628, -e.latlng.lat));
+          setSimulatedStart(clickedX, clickedY, 'Custom Pinned Start');
+          cancelTapPinMode();
+          return;
+        }
+        hideSearchResults();
+      });
+    }
+
+    /**
+     * ============================================================================
+     * 5. EXACT 1:1 OFFICIAL PDF VECTOR SVG OVERLAY (L.svgOverlay)
+     *    - Crisp at 300% zoom with zero raster tile artifacts
+     * ============================================================================
+     */
+    function buildOfficialPdfSvgOverlay() {
+      const svgNS = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(svgNS, 'svg');
+      svg.setAttribute('xmlns', svgNS);
+      svg.setAttribute('viewBox', '16 14 452 622');
+
+      // Generate parking stall tick lines helper
+      function makeStallTicks(x1, y1, x2, y2, step, tickLen, horizontal) {
+        let d = '';
+        if (horizontal) {
+          for (let x = x1; x <= x2; x += step) {
+            d += `M${x} ${y1} v${tickLen} `;
+          }
+        } else {
+          for (let y = y1; y <= y2; y += step) {
+            d += `M${x1} ${y} h${tickLen} `;
+          }
+        }
+        return d;
+      }
+
+      const lotATicks = makeStallTicks(235, 273, 4, false, 146, 152) + makeStallTicks(235, 273, 4, false, 169, 175) + makeStallTicks(235, 273, 4, false, 182, 188);
+      const stallPaths = [
+        // Lot A vertical columns
+        makeStallTicks(146, 235, 146, 273, 3.8, 5, false),
+        makeStallTicks(170, 235, 170, 273, 3.8, 5, false),
+        makeStallTicks(183, 235, 183, 273, 3.8, 5, false),
+        // Lot B stalls
+        makeStallTicks(338, 216, 338, 246, 3.8, 5, false),
+        makeStallTicks(362, 216, 362, 246, 3.8, 5, false),
+        makeStallTicks(408, 216, 408, 246, 3.8, 5, false),
+        makeStallTicks(436, 216, 436, 246, 3.8, 5, false),
+        // Lot C stalls
+        makeStallTicks(77, 369, 77, 407, 3.8, 5, false),
+        makeStallTicks(95, 369, 95, 407, 3.8, 5, false),
+        // Lot D angled/vertical stalls
+        makeStallTicks(166, 460, 250, 460, 4.2, 4.5, true),
+        makeStallTicks(166, 467, 250, 467, 4.2, 4.5, true),
+        // Lot E stalls
+        makeStallTicks(77, 449, 111, 449, 4, 4.5, true),
+        makeStallTicks(77, 465, 111, 465, 4, 4.5, true),
+        // Lot F stalls
+        makeStallTicks(426, 355, 426, 407, 3.8, 5, false),
+        makeStallTicks(439, 355, 439, 407, 3.8, 5, false),
+        // Lot G stalls
+        makeStallTicks(404, 425, 404, 455, 3.8, 5, false),
+        makeStallTicks(432, 425, 432, 455, 3.8, 5, false),
+        // Lot H stalls
+        makeStallTicks(355, 318, 437, 318, 4, 4.5, true),
+        makeStallTicks(355, 324, 437, 324, 4, 4.5, true),
+        // Lot I Morse stalls
+        makeStallTicks(401, 88, 401, 186, 4, 6, false),
+        makeStallTicks(418, 88, 418, 186, 4, 6, false),
+        makeStallTicks(436, 88, 436, 186, 4, 6, false)
+      ].join(' ');
+
+      svg.innerHTML = `
+        <!-- Official White Paper Base -->
         <rect x="16" y="14" width="452" height="622" fill="#ffffff" />
 
-        <!-- George Fox Crest & Title (Top-Left PDF Header) -->
-        <g transform="translate(82, 32)">
-          <path d="M44 0 L72 0 L68 12 L52 12 L48 25 L62 25 L59 35 L36 35 L44 0 Z M38 0 L30 35 L54 35 L57 25 L43 25 L47 12 L63 12 L66 0 Z" fill="#091f3f" opacity="0.12"/>
-          <text x="56" y="24" text-anchor="middle" font-size="28" font-weight="900" fill="#091f3f" font-family="Georgia, serif">G</text>
-          <text x="56" y="42" text-anchor="middle" font-size="13.5" font-weight="800" letter-spacing="1.2" fill="#091f3f">GEORGE FOX</text>
-          <text x="56" y="53" text-anchor="middle" font-size="8.2" font-weight="700" letter-spacing="3.2" fill="#091f3f">UNIVERSITY</text>
-          <line x1="2" y1="60" x2="110" y2="60" stroke="#cbd5e1" stroke-width="0.7" />
-          <text x="56" y="70" text-anchor="middle" font-size="6.4" font-style="italic" fill="#334155">414 North Meridian St., Newberg, OR 97132</text>
+        <!-- Top-Left George Fox University Crest & Title -->
+        <g transform="translate(76, 30)">
+          <!-- Geometric Block G Emblem (#091f3f) -->
+          <path d="M51 2 L76 2 L72.5 13 L56.5 13 L52 27 L67.5 27 L64 38 L41 38 L51 2 Z" fill="#091f3f" />
+          <path d="M59 18 L73 18 L68 38 L60 38 L63.5 24 L57.5 24 Z" fill="#091f3f" />
+          <text x="59" y="54" text-anchor="middle" font-size="14" font-weight="900" letter-spacing="1.1" fill="#091f3f">GEORGE FOX</text>
+          <text x="59" y="65" text-anchor="middle" font-size="8.2" font-weight="700" letter-spacing="3.4" fill="#091f3f">UNIVERSITY</text>
+          <line x1="2" y1="72" x2="116" y2="72" stroke="#cbd5e1" stroke-width="0.75" />
+          <text x="59" y="82" text-anchor="middle" font-size="6.4" font-style="italic" fill="#334155">414 North Meridian St., Newberg, OR 97132</text>
         </g>
-        <text x="454" y="25" text-anchor="end" font-size="6.4" font-weight="600" fill="#1e293b">Austin Sports Complex plus additional parking ½ mile ↑</text>
 
-        <!-- Campus Green Quads (Exact PDF Block Geometry) -->
-        <g id="layer-quads" fill="#c3dd69" stroke="#a6c44e" stroke-width="0.3">
-          <!-- North Morse Athletic Fields & Plant Services -->
+        <!-- Top-Right Austin Sports Complex Note -->
+        <text x="456" y="25" text-anchor="end" font-size="6.5" font-weight="700" fill="#1e293b">Austin Sports Complex plus additional parking ½ mile ↑</text>
+
+        <!-- Campus Green Quads (#c3dd69 fill, #9ebc47 thin border) -->
+        <g fill="#c3dd69" stroke="#9ebc47" stroke-width="0.45">
+          <!-- 1. North Athletic Block (Morse Fields & Plant Services) -->
           <path d="M362 31 L448 31 L448 196 L313 196 L313 138 Q336 90 362 31 Z" />
-          <!-- Northwest Block (Fulton to North, Meridian to Center) -->
+          <!-- 2. Northwest Block (Separated by E. Vermillion St.) -->
           <rect x="69" y="209" width="44" height="44" rx="2" />
           <rect x="69" y="261" width="44" height="49" rx="2" />
-          <!-- Center-North Block (Fulton to North, Center to Stadium) -->
+          <!-- 3. North-Central Block (Lot A, Bauman, Stoffer Stadium) -->
           <rect x="121" y="209" width="128" height="101" rx="2" />
-          <!-- East of Stadium to Hess Creek (Wheeler / Amphitheater) -->
+          <!-- 4. East-of-Stadium Block (Miller Gym, Wheeler, Amphitheater) -->
           <path d="M254 209 L314 209 L318 265 L312 316 L262 316 L254 285 Z" />
-          <!-- Northeast Block (Fulton to North, Creek to Villa Rd) -->
+          <!-- 5. Northeast Housing Block (Lot B, Le Shana, Newlin, Gulley, Brandt) -->
           <path d="M325 209 L448 209 L448 310 L325 310 L329 262 Z" />
-          <!-- West Mid-Campus (Lemmons, EHS, Hoover, Stevens, River St) -->
+          <!-- 6. West Mid-Campus Block (Lemmons, Rose Garden, EHS, Hoover, Stevens) -->
           <rect x="69" y="317" width="90" height="156" rx="2" />
-          <!-- Central Academic Quad (Minthorn, Chapel, Murdock, Klages, Art, Pennington) -->
+          <!-- 7. Central Academic Quad (Minthorn, Chapel, Murdock, Klages, Art, Pennington) -->
           <path d="M164 317 L260 317 L254 385 L268 422 L255 473 L164 473 Z" />
-          <!-- Creek Greenbelt & East Mid-Campus (Canyon Commons, Roberts, Hadlock, Student Life) -->
+          <!-- 8. Creek Greenbelt & East Mid-Campus Block (Canyon Commons, Roberts, Hadlock) -->
           <path d="M266 317 L320 317 L326 462 L270 462 L262 415 Z" />
           <rect x="331" y="317" width="117" height="145" rx="2" />
-          <!-- South Housing Blocks (Sheridan to Hancock) -->
+          <!-- 9. South Housing Blocks & Southeast Triangle down to Hwy 99W -->
           <rect x="69" y="481" width="44" height="58" rx="2" />
           <rect x="121" y="481" width="43" height="58" rx="2" />
           <rect x="171" y="481" width="82" height="58" rx="2" />
           <rect x="260" y="481" width="38" height="58" rx="2" />
-          <!-- South of Hancock & Southeast Triangle down to Hwy 99W -->
           <path d="M135 546 L305 546 L275 588 L175 588 Z" />
           <path d="M312 470 L448 470 L448 518 L345 574 L292 588 L305 538 Z" />
         </g>
 
-        <!-- Athletic Fields (Stoffer Family Stadium Track & Morse Baseball Diamonds) -->
-        <g id="layer-athletics">
-          <!-- Stoffer Family Stadium Oval -->
+        <!-- Athletic Fields: Stoffer Family Stadium Track & Morse Baseball Diamonds -->
+        <g>
+          <!-- Stoffer Family Stadium Oval (#1d5fa7 royal blue track + #8cb84c turf) -->
           <rect x="200" y="211" width="54" height="106" rx="27" fill="#1d5fa7" />
-          <rect x="208" y="219" width="38" height="90" rx="19" fill="#8cb84c" stroke="#ffffff" stroke-width="0.7" />
+          <rect x="203.5" y="214.5" width="47" height="99" rx="23.5" fill="none" stroke="#ffffff" stroke-width="0.35" opacity="0.7" />
+          <rect x="208" y="219" width="38" height="90" rx="19" fill="#8cb84c" stroke="#ffffff" stroke-width="0.75" />
           <rect x="213" y="228" width="28" height="72" fill="none" stroke="#ffffff" stroke-width="0.6" />
-          <!-- Morse Athletic Fields Diamonds -->
-          <path d="M321 186 L321 138 A48 48 0 0 1 388 118 L388 186 Z" fill="#8cb84c" stroke="#c07a3e" stroke-width="1.2" />
-          <path d="M349 112 L349 78 A34 34 0 0 1 388 72 L388 112 Z" fill="#8cb84c" stroke="#c07a3e" stroke-width="1" />
+          <line x1="213" y1="246" x2="241" y2="246" stroke="#ffffff" stroke-width="0.45" />
+          <line x1="213" y1="264" x2="241" y2="264" stroke="#ffffff" stroke-width="0.55" />
+          <line x1="213" y1="282" x2="241" y2="282" stroke="#ffffff" stroke-width="0.45" />
+
+          <!-- Morse Athletic Fields (#8cb84c outfields + #c07a3e terracotta diamonds + navy dugouts) -->
+          <path d="M321 186 L321 138 A48 48 0 0 1 388 118 L388 186 Z" fill="#8cb84c" stroke="#c07a3e" stroke-width="1.3" />
+          <polygon points="384,182 365,182 365,163 384,163" fill="#c07a3e" opacity="0.85" />
+          <circle cx="375" cy="173" r="2.2" fill="#ffffff" />
+          <rect x="383" y="183" width="6" height="3" transform="rotate(-45 383 183)" fill="#112856" />
+
+          <path d="M349 112 L349 78 A34 34 0 0 1 388 72 L388 112 Z" fill="#8cb84c" stroke="#c07a3e" stroke-width="1.1" />
+          <polygon points="385,109 371,109 371,95 385,95" fill="#c07a3e" opacity="0.85" />
+          <circle cx="378" cy="102" r="1.8" fill="#ffffff" />
+
+          <!-- Tennis Courts North of Miller Gym -->
+          <rect x="268" y="211" width="16" height="12" rx="1.5" fill="#e2e8f0" stroke="#94a3b8" stroke-width="0.5" />
+          <line x1="276" y1="211" x2="276" y2="223" stroke="#94a3b8" stroke-width="0.5" />
+
+          <!-- Concentric Arcs for Amphitheater (#4) -->
+          <g fill="none" stroke="#112856" stroke-width="1.6">
+            <path d="M279 306 A16 16 0 0 1 298 287" />
+            <path d="M282 308 A13 13 0 0 1 298 291" />
+            <path d="M285 310 A10 10 0 0 1 298 295" />
+            <path d="M288 312 A7 7 0 0 1 298 299" />
+          </g>
+
+          <!-- Millage Memorial Rose Garden (#36) Circular Radial Garden -->
+          <g transform="translate(156, 346)">
+            <circle cx="0" cy="0" r="8.5" fill="#8cb84c" stroke="#112856" stroke-width="0.55" />
+            <circle cx="0" cy="0" r="4.2" fill="#c3dd69" stroke="#112856" stroke-width="0.45" />
+            <line x1="-8.5" y1="0" x2="8.5" y2="0" stroke="#ffffff" stroke-width="0.9" />
+            <line x1="0" y1="-8.5" x2="0" y2="8.5" stroke="#ffffff" stroke-width="0.9" />
+          </g>
         </g>
 
-        <!-- Hess Creek Ravine -->
+        <!-- Winding Hess Creek Ravine (#6ba2dc) -->
         <path d="M366 31 C350 75 316 125 316 196 C316 232 332 248 328 274 C324 298 308 314 312 342 C316 370 295 390 298 418 C301 446 322 465 316 495 C310 525 326 548 305 568 C290 582 272 582 264 592"
               fill="none" stroke="#6ba2dc" stroke-width="3.6" stroke-linecap="round" />
 
-        <!-- Official Roadways, Parking Lots & Campus Sidewalks -->
-        <g id="layer-roads" fill="none" stroke="#f0efef" stroke-linecap="round" stroke-linejoin="round">
-          <!-- Perimeter & Campus Streets -->
-          <path d="M64 175 L64 544 Q64 554 78 558 L128 572 Q155 588 175 595 L265 595 Q315 586 355 568 L452 512" stroke="#d8dde4" stroke-width="7.5" />
-          <path d="M64 175 L64 544 Q64 554 78 558 L128 572 Q155 588 175 595 L265 595 Q315 586 355 568 L452 512" stroke="#ffffff" stroke-width="5.5" />
+        <!-- Official Roadways, Campus Sidewalks & Ravine Bridges -->
+        <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <!-- Perimeter Meridian & Hwy 99W -->
+          <path d="M64 175 L64 544 Q64 554 78 558 L128 572 Q155 588 175 595 L265 595 Q315 586 355 568 L452 512" stroke="#cbd5e1" stroke-width="7.8" />
+          <path d="M64 175 L64 544 Q64 554 78 558 L128 572 Q155 588 175 595 L265 595 Q315 586 355 568 L452 512" stroke="#ffffff" stroke-width="5.8" />
           <!-- E. Fulton St. -->
-          <path d="M64 205 L452 205" stroke="#d8dde4" stroke-width="6.5" />
+          <path d="M64 205 L452 205" stroke="#cbd5e1" stroke-width="6.6" />
           <path d="M64 205 L452 205" stroke="#ffffff" stroke-width="4.8" />
           <!-- E. Vermillion St. -->
-          <path d="M64 257 L117 257" stroke="#d8dde4" stroke-width="5" />
+          <path d="M64 257 L117 257" stroke="#cbd5e1" stroke-width="5.2" />
           <path d="M64 257 L117 257" stroke="#ffffff" stroke-width="3.6" />
           <!-- E. North St. -->
-          <path d="M64 314 L182 314 M325 314 L452 314" stroke="#d8dde4" stroke-width="5.5" />
-          <path d="M64 314 L182 314 M325 314 L452 314" stroke="#ffffff" stroke-width="4" />
+          <path d="M64 314 L182 314 M325 314 L452 314" stroke="#cbd5e1" stroke-width="5.6" />
+          <path d="M64 314 L182 314 M325 314 L452 314" stroke="#ffffff" stroke-width="4.0" />
           <!-- E. Sherman St. -->
-          <path d="M64 415 L117 415 M382 415 L452 415" stroke="#d8dde4" stroke-width="5" />
+          <path d="M64 415 L117 415 M382 415 L452 415" stroke="#cbd5e1" stroke-width="5.2" />
           <path d="M64 415 L117 415 M382 415 L452 415" stroke="#ffffff" stroke-width="3.6" />
           <!-- E. Sheridan St. -->
-          <path d="M64 477 L260 477" stroke="#d8dde4" stroke-width="5.5" />
-          <path d="M64 477 L260 477" stroke="#ffffff" stroke-width="4" />
+          <path d="M64 477 L260 477" stroke="#cbd5e1" stroke-width="5.6" />
+          <path d="M64 477 L260 477" stroke="#ffffff" stroke-width="4.0" />
           <!-- E. Hancock St. -->
-          <path d="M117 542 L260 542" stroke="#d8dde4" stroke-width="5" />
+          <path d="M117 542 L260 542" stroke="#cbd5e1" stroke-width="5.2" />
           <path d="M117 542 L260 542" stroke="#ffffff" stroke-width="3.6" />
           <!-- N. Center St., N. River St., Carlton Way, N. Villa Rd. -->
-          <path d="M117 205 L117 556 M167 477 L167 578 M257 477 L257 542 M452 195 L452 515" stroke="#d8dde4" stroke-width="5.5" />
-          <path d="M117 205 L117 556 M167 477 L167 578 M257 477 L257 542 M452 195 L452 515" stroke="#ffffff" stroke-width="4" />
+          <path d="M117 205 L117 556 M167 477 L167 578 M257 477 L257 542 M452 195 L452 515" stroke="#cbd5e1" stroke-width="5.6" />
+          <path d="M117 205 L117 556 M167 477 L167 578 M257 477 L257 542 M452 195 L452 515" stroke="#ffffff" stroke-width="4.0" />
 
-          <!-- Quad Sidewalks & Diagonal Walkways -->
-          <path d="M135 348 L195 408 M195 348 L135 408 M164 317 L164 473 M117 368 L260 368 M117 424 L260 424 M260 317 L260 473" stroke="#ffffff" stroke-width="2.1" />
+          <!-- Diagonal & Orthogonal Quad Sidewalks -->
+          <path d="M135 348 L195 408 M195 348 L135 408 M164 317 L164 473 M117 368 L260 368 M117 424 L260 424 M260 317 L260 473" stroke="#ffffff" stroke-width="2.2" />
+          <!-- East Campus Curving Walks & One-Way Drive -->
+          <path d="M360 246 Q365 280 355 314 M358 377 L358 456 M364 480 L364 555" stroke="#ffffff" stroke-width="2.4" />
+
           <!-- Wheeler Bridge & Crisman Crossing -->
-          <path d="M276 266 L360 246" stroke="#ffffff" stroke-width="3.2" />
-          <path d="M276 264 L360 244 M276 268 L360 248" stroke="#112856" stroke-width="0.9" />
-          <path d="M274 373 L325 377" stroke="#ffffff" stroke-width="3.2" />
-          <path d="M274 371 L325 375 M274 375 L325 379" stroke="#112856" stroke-width="0.9" />
+          <path d="M276 266 L360 246" stroke="#ffffff" stroke-width="3.4" />
+          <path d="M276 264 L360 244 M276 268 L360 248" stroke="#112856" stroke-width="0.95" />
+          <path d="M274 373 L325 377" stroke="#ffffff" stroke-width="3.4" />
+          <path d="M274 371 L325 375 M274 375 L325 379" stroke="#112856" stroke-width="0.95" />
         </g>
 
-        <!-- Parking Lot Pads (A–J) -->
-        <g id="layer-parking-pads" fill="#f0efef" stroke="#cbd5e1" stroke-width="0.6">
-          <!-- Lot A -->
+        <!-- Parking Lot Pads (A–J) + Visitor Row in Lot E + Stall Tick Lines -->
+        <g fill="#f0efef" stroke="#cbd5e1" stroke-width="0.6">
           <rect x="143" y="232" width="46" height="44" rx="2" />
-          <!-- Lot B -->
           <rect x="335" y="213" width="108" height="36" rx="2" />
-          <!-- Lot C -->
           <rect x="74" y="366" width="28" height="44" rx="2" />
-          <!-- Lot D -->
           <rect x="163" y="458" width="90" height="14" rx="2" />
-          <!-- Lot E -->
           <rect x="74" y="446" width="40" height="26" rx="2" />
-          <!-- Lot F -->
           <rect x="424" y="352" width="22" height="58" rx="2" />
-          <!-- Lot G -->
           <rect x="401" y="422" width="38" height="36" rx="2" />
-          <!-- Lot H -->
           <rect x="352" y="316" width="88" height="13" rx="2" />
-          <!-- Lot I -->
           <rect x="398" y="84" width="46" height="106" rx="2" />
-          <!-- Lot J -->
           <polygon points="392,504 432,482 442,500 402,522" />
         </g>
+        <!-- Lot E Green Visitor Parking Row + Pointer Arrow from Visitor V -->
+        <rect x="75" y="447" width="38" height="5.5" rx="1" fill="#c3dd69" stroke="#7ac143" stroke-width="0.6" />
+        <line x1="56" y1="450" x2="73" y2="450" stroke="#112856" stroke-width="0.8" />
+        <polygon points="73,450 70,448.3 70,451.7" fill="#112856" />
 
-        <!-- Street & Bridge Labels -->
+        <!-- Crisp Parking Stall Tick Marks -->
+        <path d="${stallPaths}" stroke="#94a3b8" stroke-width="0.55" fill="none" />
+
+        <!-- Official Street, Bridge & North Arrow Labels -->
         <g font-size="4.6" font-weight="700" fill="#334155" letter-spacing="0.3">
           <text x="235" y="203.5" text-anchor="middle">E. FULTON ST.</text>
           <text x="90" y="255.8" text-anchor="middle">E. VERMILLION ST.</text>
@@ -338,606 +1195,854 @@
           <text x="450.5" y="375" text-anchor="middle" transform="rotate(-90 450.5 375)">N. VILLA ROAD</text>
           <text x="322" y="254" text-anchor="middle" font-size="4.1" transform="rotate(-13 322 254)">WHEELER BRIDGE</text>
           <text x="300" y="372" text-anchor="middle" font-size="4.1" transform="rotate(4 300 372)">CRISMAN CROSSING</text>
+          <text x="364" y="520" text-anchor="middle" font-size="3.8" transform="rotate(90 364 520)">ONE WAY →</text>
+          <!-- North Arrow at Bottom Right -->
+          <text x="442" y="563" text-anchor="middle" font-size="7.5" font-weight="800" fill="#112856">↑</text>
+          <text x="442" y="571" text-anchor="middle" font-size="6.5" font-weight="800" fill="#112856">N</text>
         </g>
+      `;
 
-        <!-- Dynamic Building Footprints, Badges, Route Polyline & GPS Dot -->
-        <g id="layer-buildings"></g>
-        <g id="layer-lots"></g>
-        <g id="layer-amenities"></g>
-        <g id="layer-route"></g>
-        <g id="layer-gps"></g>
-      </svg>
-    </div>
-  </div>
+      L.svgOverlay(svg, PDF_BOUNDS, { interactive: false }).addTo(map);
+    }
 
-  <!-- GPS Status Indicator -->
-  <div class="gps-pill" id="gpsStatusPill" title="Tap to set simulated start location">
-    <span class="dot-sim" id="gpsDot"></span>
-    <span id="gpsLabel">Locating GPS… (Tap to Simulate)</span>
-  </div>
+    /**
+     * ============================================================================
+     * 6. OFFICIAL PDF GRID LAYER (A–G COLUMNS, 1–10 ROWS)
+     * ============================================================================
+     */
+    function buildPdfGridLayer() {
+      pdfGridLayer.clearLayers();
+      const cols = [
+        { label: 'A', x1: 18, x2: 64 },
+        { label: 'B', x1: 64, x2: 117 },
+        { label: 'C', x1: 117, x2: 185 },
+        { label: 'D', x1: 185, x2: 260 },
+        { label: 'E', x1: 260, x2: 331 },
+        { label: 'F', x1: 331, x2: 398 },
+        { label: 'G', x1: 398, x2: 465 }
+      ];
+      const rows = [
+        { label: '10', y1: 25, y2: 80 },
+        { label: '9',  y1: 80, y2: 138 },
+        { label: '8',  y1: 138, y2: 205 },
+        { label: '7',  y1: 205, y2: 260 },
+        { label: '6',  y1: 260, y2: 314 },
+        { label: '5',  y1: 314, y2: 372 },
+        { label: '4',  y1: 372, y2: 425 },
+        { label: '3',  y1: 425, y2: 477 },
+        { label: '2',  y1: 477, y2: 542 },
+        { label: '1',  y1: 542, y2: 598 }
+      ];
 
-  <!-- Right Floating Zoom & Recenter Controls -->
-  <div class="map-controls">
-    <button class="fab" id="gpsBtn" title="Center on My Location">◎</button>
-    <button class="fab" id="zoomInBtn" title="Zoom In">+</button>
-    <button class="fab" id="zoomOutBtn" title="Zoom Out">−</button>
-  </div>
+      cols.forEach(c => {
+        L.polyline([pdfToLatLng(c.x1, 25), pdfToLatLng(c.x1, 598)], {
+          color: '#94a3b8', weight: 1, dashArray: '4,4', opacity: 0.65, interactive: false
+        }).addTo(pdfGridLayer);
 
-  <!-- Bottom Destination & Turn-by-Turn Navigation Sheet -->
-  <div class="bottom-sheet" id="bottomSheet">
-    <div class="sheet-header">
-      <div>
-        <h2 class="sheet-title" id="destTitle">George Fox University — Newberg</h2>
-        <div class="sheet-sub" id="destSub">414 N. Meridian St. • Search or tap any building to route</div>
-      </div>
-      <span id="destBadge" style="background:#112856;color:#fff;font-size:12px;font-weight:700;padding:4px 9px;border-radius:8px;">GFU</span>
-    </div>
-    <div class="sheet-actions">
-      <button class="btn-primary" id="routeBtn">🧭 Get Walking Directions</button>
-      <button class="btn-secondary" id="simBtn">📍 Set Start</button>
-    </div>
-    <div class="route-steps" id="routeSteps"></div>
-  </div>
-</div>
+        const midX = (c.x1 + c.x2) / 2;
+        L.marker(pdfToLatLng(midX, 608), {
+          icon: L.divIcon({
+            className: '',
+            html: `<div class="grid-badge" style="transform:translate(-50%,-50%)">${c.label}</div>`,
+            iconSize: [0, 0]
+          }),
+          interactive: false
+        }).addTo(pdfGridLayer);
+      });
 
-<!-- Legend / Simulate Start Modal -->
-<div class="modal-backdrop" id="modalBackdrop">
-  <div class="modal-card" id="modalContent"></div>
-</div>
+      rows.forEach(r => {
+        L.polyline([pdfToLatLng(18, r.y1), pdfToLatLng(465, r.y1)], {
+          color: '#94a3b8', weight: 1, dashArray: '4,4', opacity: 0.65, interactive: false
+        }).addTo(pdfGridLayer);
 
-<script>
-// Exact PDF Coordinates (viewBox 16..468, 14..636) for all 98 Buildings, Parking Lots A-J/V & Off-Campus Sites
-const PLACES = [
-  // Campus Facilities (1-58) - Navy (#112856)
-  {id:"1",num:"1",name:"Academic Resource Center",cat:"facility",grid:"D4",x:220.3,y:385.3,w:18,h:14,aed:true},
-  {id:"2",num:"2",name:"Administrative Media Production",cat:"facility",grid:"B6",x:81.3,y:301.5,w:13,h:10},
-  {id:"3",num:"3",name:"Alumni Plaza",cat:"facility",grid:"D6",x:205.2,y:310.4,w:8,h:8},
-  {id:"4",num:"4",name:"Amphitheater",cat:"facility",grid:"E6",x:293.0,y:302.0,w:24,h:18},
-  {id:"5",num:"5",name:"Armstrong House",cat:"facility",grid:"B2",x:103.6,y:494.3,w:9,h:9},
-  {id:"6",num:"6",name:"Art & Cinematic Arts Building",cat:"facility",grid:"D3",x:227.9,y:442.0,w:19,h:22},
-  {id:"7",num:"7",name:"Barclay House (SpiL/GFD)",cat:"facility",grid:"F6",x:342.6,y:299.0,w:8,h:12},
-  {id:"8",num:"8",name:"Bauman Auditorium",cat:"facility",grid:"C6",x:164.4,y:292.0,w:22,h:28,aed:true},
-  {id:"9",num:"9",name:"Beals House",cat:"facility",grid:"D2",x:202.0,y:526.2,w:9,h:12},
-  {id:"10",num:"10",name:"Bruin Community Pantry",cat:"facility",grid:"F3",x:393.4,y:424.5,w:8,h:8},
-  {id:"11",num:"11",name:"Bruin Store",cat:"facility",grid:"D4",x:224.0,y:403.7,w:14,h:12},
-  {id:"12",num:"12",name:"Canyon Commons",cat:"facility",grid:"F5",x:339.0,y:346.0,w:20,h:38,aed:true,baby:true},
-  {id:"13",num:"13",name:"Centennial Tower",cat:"facility",grid:"C4",x:174.0,y:395.4,w:6,h:6},
-  {id:"14",num:"14",name:"Center Street House",cat:"facility",grid:"B6",x:101.0,y:296.0,w:8,h:13},
-  {id:"15",num:"15",name:"Chapel",cat:"facility",grid:"D5",x:249.9,y:343.0,w:24,h:12},
-  {id:"16",num:"16",name:"Costume Studio",cat:"facility",grid:"C7",x:125.2,y:258.4,w:11,h:8},
-  {id:"17",num:"17",name:"Duke Athletic Center",cat:"facility",grid:"D7",x:182.0,y:216.5,w:24,h:11,aed:true},
-  {id:"18",num:"18",name:"Edwards-Holman Science Center",cat:"facility",grid:"C5",x:134.3,y:370.8,w:18,h:24,aed:true,baby:true},
-  {id:"19",num:"19",name:"Engineering Maker Hub",cat:"facility",grid:"D4",x:207.7,y:421.4,w:16,h:11},
-  {id:"20",num:"20",name:"Fry House",cat:"facility",grid:"D2",x:241.3,y:497.4,w:8,h:9},
-  {id:"21",num:"21",name:"Hadlock Student Center",cat:"facility",grid:"F4",x:341.4,y:414.0,w:24,h:34,aed:true},
-  {id:"22",num:"22",name:"Health and Counseling Center",cat:"facility",grid:"C2",x:186.4,y:526.8,w:13,h:12},
-  {id:"23",num:"23",name:"Hiebert House (Campus Public Safety)",cat:"facility",grid:"D2",x:266.5,y:491.4,w:11,h:8},
-  {id:"24",num:"24",name:"Hodgin Studio",cat:"facility",grid:"D2",x:216.0,y:507.0,w:10,h:5},
-  {id:"25",num:"25",name:"Hoover Academic Building",cat:"facility",grid:"C4",x:130.0,y:399.5,w:18,h:18,aed:true},
-  {id:"26",num:"26",name:"Intercultural Resource Center",cat:"facility",grid:"D2",x:203.2,y:494.8,w:12,h:8},
-  {id:"27",num:"27",name:"Klages Center",cat:"facility",grid:"D4",x:208.5,y:408.3,w:22,h:16,aed:true},
-  {id:"28",num:"28",name:"Lemmons Center",cat:"facility",grid:"B5",x:117.0,y:331.0,w:44,h:18},
-  {id:"29",num:"29",name:"Lemmons Family Field",cat:"facility",grid:"D6",x:227.0,y:264.0,w:26,h:68},
-  {id:"30",num:"30",name:"Lindgren Gallery",cat:"facility",grid:"C6",x:175.9,y:296.3,w:14,h:16},
-  {id:"31",num:"31",name:"Mail Services (Room 120)",cat:"facility",grid:"F4",x:390.8,y:394.3,w:14,h:16},
-  {id:"32",num:"32",name:"Maker's Market",cat:"facility",grid:"D4",x:218.1,y:413.3,w:14,h:11},
-  {id:"33",num:"33",name:"Margaret Lemmons House",cat:"facility",grid:"B2",x:81.6,y:495.6,w:10,h:10},
-  {id:"34",num:"34",name:"Meridian Street House (HR)",cat:"facility",grid:"B2",x:81.9,y:517.2,w:12,h:8},
-  {id:"35",num:"35",name:"Millage Building",cat:"facility",grid:"F2",x:393.8,y:488.6,w:14,h:16},
-  {id:"36",num:"36",name:"Millage Memorial Rose Garden",cat:"facility",grid:"C5",x:156.0,y:346.0,w:16,h:16},
-  {id:"37",num:"37",name:"Miller Gym",cat:"facility",grid:"E7",x:276.0,y:244.0,w:28,h:24,aed:true},
-  {id:"38",num:"38",name:"Minthorne Gallery",cat:"facility",grid:"B4",x:119.4,y:413.0,w:14,h:14},
-  {id:"39",num:"39",name:"Minthorn Hall",cat:"facility",grid:"C5",x:191.6,y:340.5,w:14,h:11},
-  {id:"40",num:"40",name:"Morse Athletic Fields",cat:"facility",grid:"F8",x:368.0,y:152.0,w:42,h:48,aed:true},
-  {id:"41",num:"41",name:"Murdock Library",cat:"facility",grid:"D5",x:210.7,y:364.6,w:20,h:24,aed:true,mother:true},
-  {id:"42",num:"42",name:"Nash House",cat:"facility",grid:"B7",x:79.4,y:215.7,w:10,h:11},
-  {id:"43",num:"43",name:"Pavilion",cat:"facility",grid:"E3",x:313.1,y:466.8,w:10,h:10},
-  {id:"44",num:"44",name:"Pennington House (Honors)",cat:"facility",grid:"C2",x:126.8,y:497.8,w:12,h:12},
-  {id:"45",num:"45",name:"River Street House (Marcom)",cat:"facility",grid:"C3",x:151.0,y:464.9,w:16,h:11},
-  {id:"46",num:"46",name:"Roberts Center",cat:"facility",grid:"F5",x:396.0,y:366.0,w:34,h:46,aed:true,baby:true},
-  {id:"47",num:"47",name:"Ron Gregory Atrium",cat:"facility",grid:"C4",x:125.6,y:360.4,w:14,h:14},
-  {id:"48",num:"48",name:"Ross Center",cat:"facility",grid:"C6",x:188.5,y:296.4,w:14,h:16},
-  {id:"49",num:"49",name:"Senior Design Studio",cat:"facility",grid:"E4",x:279.6,y:418.5,w:9,h:9},
-  {id:"50",num:"50",name:"Stevens Center",cat:"facility",grid:"C3",x:144.5,y:438.1,w:24,h:26,aed:true},
-  {id:"51",num:"51",name:"Stoffer Family Stadium",cat:"facility",grid:"D7",x:197.0,y:264.0,w:9,h:34},
-  {id:"52",num:"52",name:"Student Life Offices",cat:"facility",grid:"F4",x:354.1,y:422.3,w:18,h:24},
-  {id:"53",num:"53",name:"Thomas Center (Plant Services)",cat:"facility",grid:"G10",x:408.0,y:44.0,w:26,h:30,aed:true},
-  {id:"54",num:"54",name:"Thornburg House (Academic Affairs)",cat:"facility",grid:"C2",x:147.6,y:496.0,w:14,h:10,aed:true},
-  {id:"55",num:"55",name:"Vermillion St. House",cat:"facility",grid:"B6",x:106.0,y:268.4,w:8,h:9},
-  {id:"56",num:"56",name:"Wheeler Sports Center",cat:"facility",grid:"E6",x:277.2,y:272.7,w:24,h:22,baby:true},
-  {id:"57",num:"57",name:"Wood-Mar Hall",cat:"facility",grid:"B4",x:116.3,y:374.0,w:13,h:18},
-  {id:"58",num:"58",name:"Wright House (MSW)",cat:"facility",grid:"G5",x:439.5,y:337.0,w:12,h:9},
+        const midY = (r.y1 + r.y2) / 2;
+        L.marker(pdfToLatLng(24, midY), {
+          icon: L.divIcon({
+            className: '',
+            html: `<div class="grid-badge" style="transform:translate(-50%,-50%)">${r.label}</div>`,
+            iconSize: [0, 0]
+          }),
+          interactive: false
+        }).addTo(pdfGridLayer);
+      });
+    }
 
-  // Student Housing (59-98) - Gold (#f68536)
-  {id:"59",num:"59",name:"Anderson House",cat:"housing",grid:"B2",x:104.4,y:506.4,w:9,h:9},
-  {id:"60",num:"60",name:"Beebe Residence Hall",cat:"housing",grid:"E3",x:276.4,y:472.7,w:10,h:14},
-  {id:"61",num:"61",name:"Brandt Residence Hall",cat:"housing",grid:"G6",x:419.1,y:299.7,w:42,h:11},
-  {id:"62",num:"62",name:"Campbell House",cat:"housing",grid:"B6",x:81.3,y:267.5,w:9,h:9},
-  {id:"63",num:"63",name:"Carey Residence Hall",cat:"housing",grid:"E3",x:289.6,y:466.3,w:10,h:16},
-  {id:"64",num:"64",name:"Chapman House",cat:"housing",grid:"D1",x:221.2,y:552.8,w:8,h:8},
-  {id:"65",num:"65",name:"Cole House",cat:"housing",grid:"G10",x:462.0,y:35.0,w:8,h:10},
-  {id:"66",num:"66",name:"Edwards Residence Hall",cat:"housing",grid:"D4",x:257.6,y:398.3,w:12,h:34},
-  {id:"67",num:"67",name:"Fell House",cat:"housing",grid:"E1",x:264.2,y:553.1,w:8,h:8},
-  {id:"68",num:"68",name:"Fulton Street House",cat:"housing",grid:"C7",x:125.9,y:215.7,w:11,h:13},
-  {id:"69",num:"69",name:"Gulley Residence Hall",cat:"housing",grid:"F6",x:372.0,y:300.5,w:24,h:12,aed:true},
-  {id:"70",num:"70",name:"Hancock Street House",cat:"housing",grid:"C1",x:194.0,y:552.8,w:8,h:8},
-  {id:"71",num:"71",name:"Hartley House",cat:"housing",grid:"B7",x:81.7,y:246.3,w:12,h:8},
-  {id:"72",num:"72",name:"Hester House",cat:"housing",grid:"C2",x:179.7,y:504.4,w:9,h:8},
-  {id:"73",num:"73",name:"Hobson Residence Hall",cat:"housing",grid:"F3",x:346.8,y:465.3,w:10,h:24},
-  {id:"74",num:"74",name:"Hodgin House",cat:"housing",grid:"D2",x:218.7,y:498.2,w:9,h:9},
-  {id:"75",num:"75",name:"Holtan House",cat:"housing",grid:"G10",x:436.9,y:54.3,w:12,h:10},
-  {id:"76",num:"76",name:"Hoskins House",cat:"housing",grid:"C2",x:180.5,y:494.3,w:10,h:8},
-  {id:"77",num:"77",name:"Kelsey House",cat:"housing",grid:"B6",x:126.5,y:279.8,w:9,h:12},
-  {id:"78",num:"78",name:"Lamm Duplex",cat:"housing",grid:"D2",x:217.8,y:524.8,w:11,h:14},
-  {id:"79",num:"79",name:"Le Shana Residence Hall",cat:"housing",grid:"F6",x:385.0,y:264.4,w:34,h:12,aed:true},
-  {id:"80",num:"80",name:"Lewis Apartments",cat:"housing",grid:"F3",x:386.0,y:436.7,w:22,h:18},
-  {id:"81",num:"81",name:"Macy Residence Hall",cat:"housing",grid:"F3",x:380.7,y:465.8,w:10,h:24},
-  {id:"82",num:"82",name:"McConaughey House",cat:"housing",grid:"A2",x:24.0,y:495.5,w:9,h:9},
-  {id:"83",num:"83",name:"McGrew House",cat:"housing",grid:"D2",x:242.3,y:525.3,w:9,h:14},
-  {id:"84",num:"84",name:"Newlin Residence Hall",cat:"housing",grid:"G6",x:430.3,y:263.5,w:26,h:12},
-  {id:"85",num:"85",name:"Parker Duplex",cat:"housing",grid:"D2",x:231.7,y:504.3,w:9,h:11},
-  {id:"86",num:"86",name:"Pennington Residence Hall",cat:"housing",grid:"C3",x:192.0,y:445.5,w:28,h:14},
-  {id:"87",num:"87",name:"Riley House",cat:"housing",grid:"D1",x:246.0,y:554.7,w:8,h:8},
-  {id:"88",num:"88",name:"Roy Apartments",cat:"housing",grid:"C6",x:134.5,y:298.8,w:10,h:14},
-  {id:"89",num:"89",name:"Rutherford Apartments",cat:"housing",grid:"A2",x:45.5,y:513.9,w:13,h:8},
-  {id:"90",num:"90",name:"Schomburg House",cat:"housing",grid:"B6",x:81.2,y:278.2,w:9,h:10},
-  {id:"91",num:"91",name:"Sutton Residence Hall",cat:"housing",grid:"F3",x:364.0,y:465.5,w:22,h:14,aed:true},
-  {id:"92",num:"92",name:"Villa House",cat:"housing",grid:"B2",x:93.5,y:496.0,w:9,h:9},
-  {id:"93",num:"93",name:"Weesner House",cat:"housing",grid:"E2",x:266.8,y:518.9,w:12,h:8},
-  {id:"94",num:"94",name:"Weesner Village",cat:"housing",grid:"E3",x:266.0,y:442.5,w:11,h:28},
-  {id:"95",num:"95",name:"Wilder House",cat:"housing",grid:"F2",x:349.1,y:513.4,w:10,h:14},
-  {id:"96",num:"96",name:"Willcuts Residence Hall",cat:"housing",grid:"E3",x:281.8,y:483.5,w:18,h:9},
-  {id:"97",num:"97",name:"Winters Apartments",cat:"housing",grid:"C2",x:149.2,y:520.0,w:18,h:18},
-  {id:"98",num:"98",name:"Woolman Apartments",cat:"housing",grid:"D1",x:204.0,y:568.0,w:24,h:16},
-
-  // Parking Lots (A-J & Visitor V)
-  {id:"lotA",num:"A",name:"Bauman/Ross Center Parking Lot A",cat:"parking",grid:"C7",x:160.8,y:248.0,visitor:true},
-  {id:"lotB",num:"B",name:"Wheeler/Le Shana Parking Lot B",cat:"parking",grid:"F7",x:373.8,y:226.0,visitor:true},
-  {id:"lotC",num:"C",name:"Hoover/Wood-Mar Parking Lot C",cat:"parking",grid:"B4",x:88.0,y:396.0},
-  {id:"lotD",num:"D",name:"Pennington Hall Parking Lot D",cat:"parking",grid:"D3",x:208.2,y:465.0},
-  {id:"lotE",num:"E",name:"Stevens Center Parking Lot E",cat:"parking",grid:"B3",x:94.0,y:458.0,visitor:true},
-  {id:"lotF",num:"F",name:"Roberts Center Parking Lot F",cat:"parking",grid:"G4",x:435.0,y:365.0,visitor:true},
-  {id:"lotG",num:"G",name:"Hobson/Macy/Sutton/Lewis Lot G",cat:"parking",grid:"G3",x:418.0,y:440.0},
-  {id:"lotH",num:"H",name:"North Street Lot H",cat:"parking",grid:"G5",x:403.0,y:322.5},
-  {id:"lotI",num:"I",name:"Morse Parking Lot I",cat:"parking",grid:"G8",x:421.0,y:135.0},
-  {id:"lotJ",num:"J",name:"Millage Parking Lot J",cat:"parking",grid:"G2",x:415.0,y:503.0},
-
-  // Page 2 Off-Campus Facilities
-  {id:"off1",num:"OFF",name:"Austin Sports Complex (½ mi North on Center St.)",cat:"offcampus",grid:"North",x:117.0,y:178.0,lat:45.3138,lng:-122.9702},
-  {id:"off2",num:"OFF",name:"George Fox Medical Sciences Bldg. (Hayes & Werth)",cat:"offcampus",grid:"East",x:452.0,y:512.0,lat:45.3082,lng:-122.9368},
-  {id:"off3",num:"OFF",name:"George Fox Portland Center (12753 SW 68th Ave)",cat:"offcampus",grid:"Tigard",x:452.0,y:512.0,lat:45.4276,lng:-122.7471}
-];
-
-// Campus Pedestrian & Street Routing Graph (matches exact PDF streets, sidewalks & bridges)
-const NODES = {
-  n_mer_ful: [64, 205], n_cen_ful: [117, 205], n_sta_ful: [200, 205], n_whe_ful: [275, 205], n_lotb_ful: [374, 205], n_vil_ful: [452, 205],
-  n_mer_ver: [64, 257], n_cen_ver: [117, 257], n_lota: [161, 257],
-  n_mer_nor: [64, 314], n_cen_nor: [117, 314], n_bau_nor: [176, 314], n_sta_s: [215, 322], n_whe_w: [274, 266], n_whe_e: [360, 246],
-  n_vil_nor: [452, 314], n_loth: [403, 314], n_les_s: [374, 286],
-  n_mer_mid: [64, 368], n_cen_mid: [117, 368], n_quad_nw: [164, 368], n_mur_w: [200, 368], n_cha_s: [255, 368], n_cri_w: [274, 373], n_cri_e: [325, 377],
-  n_can_s: [358, 377], n_rob_w: [382, 377], n_vil_mid: [452, 377],
-  n_mer_she: [64, 415], n_cen_she: [117, 415], n_quad_sw: [164, 424], n_kla_s: [215, 424], n_edw_s: [255, 424],
-  n_had_w: [326, 424], n_had_e: [378, 424], n_vil_she: [452, 415],
-  n_mer_shd: [64, 477], n_cen_shd: [117, 477], n_riv_shd: [167, 477], n_lotd: [208, 477], n_car_shd: [257, 477],
-  n_hob_n: [345, 456], n_vil_lotg: [452, 445], n_vil_lotj: [452, 512],
-  n_cen_han: [117, 542], n_riv_han: [167, 542], n_car_han: [257, 542], n_woo_s: [205, 565],
-  n_mor_s: [421, 196], n_mor_n: [421, 70]
-};
-const EDGES = [
-  ["n_mer_ful","n_cen_ful"],["n_cen_ful","n_sta_ful"],["n_sta_ful","n_whe_ful"],["n_whe_ful","n_lotb_ful"],["n_lotb_ful","n_vil_ful"],
-  ["n_lotb_ful","n_mor_s"],["n_mor_s","n_mor_n"],["n_vil_ful","n_vil_nor"],["n_vil_nor","n_vil_mid"],["n_vil_mid","n_vil_she"],["n_vil_she","n_vil_lotg"],["n_vil_lotg","n_vil_lotj"],
-  ["n_mer_ful","n_mer_ver"],["n_mer_ver","n_mer_nor"],["n_mer_nor","n_mer_mid"],["n_mer_mid","n_mer_she"],["n_mer_she","n_mer_shd"],
-  ["n_cen_ful","n_cen_ver"],["n_cen_ver","n_cen_nor"],["n_cen_nor","n_cen_mid"],["n_cen_mid","n_cen_she"],["n_cen_she","n_cen_shd"],["n_cen_shd","n_cen_han"],
-  ["n_mer_ver","n_cen_ver"],["n_cen_ver","n_lota"],["n_lota","n_bau_nor"],
-  ["n_mer_nor","n_cen_nor"],["n_cen_nor","n_bau_nor"],["n_bau_nor","n_sta_s"],["n_sta_s","n_whe_w"],["n_whe_ful","n_whe_w"],
-  ["n_whe_w","n_whe_e"],["n_whe_e","n_les_s"],["n_les_s","n_loth"],["n_loth","n_vil_nor"],["n_lotb_ful","n_whe_e"],
-  ["n_mer_mid","n_cen_mid"],["n_cen_mid","n_quad_nw"],["n_quad_nw","n_mur_w"],["n_mur_w","n_cha_s"],["n_cha_s","n_cri_w"],
-  ["n_sta_s","n_cha_s"],["n_cri_w","n_cri_e"],["n_cri_e","n_can_s"],["n_can_s","n_rob_w"],["n_rob_w","n_vil_mid"],["n_loth","n_can_s"],
-  ["n_mer_she","n_cen_she"],["n_cen_she","n_quad_sw"],["n_quad_nw","n_quad_sw"],["n_quad_sw","n_kla_s"],["n_mur_w","n_kla_s"],["n_kla_s","n_edw_s"],["n_cha_s","n_edw_s"],
-  ["n_can_s","n_had_w"],["n_had_w","n_had_e"],["n_had_e","n_vil_she"],["n_had_w","n_hob_n"],["n_hob_n","n_vil_lotg"],
-  ["n_mer_shd","n_cen_shd"],["n_cen_shd","n_riv_shd"],["n_riv_shd","n_lotd"],["n_lotd","n_car_shd"],["n_quad_sw","n_riv_shd"],["n_edw_s","n_car_shd"],
-  ["n_riv_shd","n_riv_han"],["n_car_shd","n_car_han"],["n_cen_han","n_riv_han"],["n_riv_han","n_car_han"],["n_riv_han","n_woo_s"],["n_car_han","n_woo_s"]
-];
-
-// Geo-Calibration: Newberg, OR (Latitude/Longitude) <-> PDF SVG (x, y)
-// Anchors: Meridian & Fulton (45.30755, -122.97185) -> (64, 205); Villa & Sherman (45.30335, -122.96335) -> (452, 415)
-function latLngToPdf(lat, lng) {
-  const x = 64 + ((lng - (-122.97185)) / ((-122.96335) - (-122.97185))) * (452 - 64);
-  const y = 205 + ((45.30755 - lat) / (45.30755 - 45.30335)) * (415 - 205);
-  return [x, y];
-}
-
-// App State
-let state = {
-  scale: 1.0, tx: 0, ty: 0,
-  userPdf: [171.1, 261.0], // Default start: Visitor Lot V near Bauman
-  isLiveGps: false,
-  tapToSetStart: false,
-  selectedPlace: PLACES.find(p => p.id === "41"), // Default: Murdock Library
-  activeCat: "all"
-};
-
-const svgEl = document.getElementById("campusSvg");
-const stageEl = document.getElementById("mapStage");
-const viewportEl = document.getElementById("viewport");
-
-// Render Buildings, Parking Badges & Amenities into SVG
-function renderMapLayers() {
-  const bLayer = document.getElementById("layer-buildings");
-  const lLayer = document.getElementById("layer-lots");
-  const aLayer = document.getElementById("layer-amenities");
-  bLayer.innerHTML = ""; lLayer.innerHTML = ""; aLayer.innerHTML = "";
-
-  PLACES.forEach(p => {
-    if (p.cat === "facility" || p.cat === "housing") {
-      const fill = p.cat === "facility" ? "#112856" : "#f68536";
-      const w = p.w || 12, h = p.h || 10;
-      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-      g.style.cursor = "pointer";
-      g.addEventListener("click", (e) => { e.stopPropagation(); selectPlace(p); });
-
-      const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-      rect.setAttribute("x", p.x - w/2);
-      rect.setAttribute("y", p.y - h/2);
-      rect.setAttribute("width", w);
-      rect.setAttribute("height", h);
-      rect.setAttribute("rx", "1.2");
-      rect.setAttribute("fill", fill);
-      rect.setAttribute("stroke", state.selectedPlace && state.selectedPlace.id === p.id ? "#38bdf8" : "#ffffff");
-      rect.setAttribute("stroke-width", state.selectedPlace && state.selectedPlace.id === p.id ? "1.6" : "0.35");
-      g.appendChild(rect);
-
-      const txt = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      txt.setAttribute("x", p.x);
-      txt.setAttribute("y", p.y + 1.6);
-      txt.setAttribute("text-anchor", "middle");
-      txt.setAttribute("font-size", "4.6");
-      txt.setAttribute("font-weight", "700");
-      txt.setAttribute("fill", p.cat === "facility" ? "#ffffff" : "#112856");
-      txt.textContent = p.num;
-      g.appendChild(txt);
-      bLayer.appendChild(g);
-
-      // Micro-badges for AED / Mother's Room / Baby Changing
-      if (p.aed) {
-        const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-        c.setAttribute("cx", p.x + w/2 - 1); c.setAttribute("cy", p.y - h/2 + 1);
-        c.setAttribute("r", "2.3"); c.setAttribute("fill", "#ed1c24"); c.setAttribute("stroke", "#fff"); c.setAttribute("stroke-width", "0.4");
-        aLayer.appendChild(c);
+    function togglePdfGrid() {
+      isGridVisible = !isGridVisible;
+      const btn = document.getElementById('gridToggleBtn');
+      if (isGridVisible) {
+        pdfGridLayer.addTo(map);
+        btn.classList.add('bg-[#112856]', 'text-white', 'border-[#112856]');
+        btn.classList.remove('bg-white/95', 'text-slate-700');
+        showToast('Official PDF Grid (A–G, 1–10) shown');
+      } else {
+        map.removeLayer(pdfGridLayer);
+        btn.classList.remove('bg-[#112856]', 'text-white', 'border-[#112856]');
+        btn.classList.add('bg-white/95', 'text-slate-700');
+        showToast('PDF Grid hidden');
       }
-      if (p.mother) {
-        const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-        c.setAttribute("cx", p.x - w/2 + 1); c.setAttribute("cy", p.y - h/2 + 1);
-        c.setAttribute("r", "2.3"); c.setAttribute("fill", "#f140a9"); c.setAttribute("stroke", "#fff"); c.setAttribute("stroke-width", "0.4");
-        aLayer.appendChild(c);
+    }
+
+    /**
+     * ============================================================================
+     * 7. RENDER ALL 98 BUILDINGS, PARKING LOTS (A–J, V) & CUSTOM PDF SVG ICONS
+     * ============================================================================
+     */
+    function placeMatchesFilter(p, cat) {
+      if (cat === 'all') return true;
+      if (cat === 'facility') return p.cat === 'facility';
+      if (cat === 'housing') return p.cat === 'housing';
+      if (cat === 'parking') return p.cat === 'parking';
+      if (cat === 'amenity') return Boolean(p.aed || p.baby || p.mother);
+      if (cat === 'offcampus') return p.cat === 'offcampus';
+      return true;
+    }
+
+    function renderBuildingsAndIcons() {
+      buildingsLayer.clearLayers();
+      lotsAndIconsLayer.clearLayers();
+
+      PLACES.forEach(p => {
+        const matches = placeMatchesFilter(p, activeFilterCat);
+        const isSelected = selectedPlace && selectedPlace.id === p.id;
+        const opacity = matches ? 1 : 0.20;
+
+        if (p.cat === 'facility' || p.cat === 'housing') {
+          const w = p.w || 12;
+          const h = p.h || 10;
+          const fill = p.cat === 'facility' ? '#112856' : '#f68536';
+          const border = isSelected ? '#1a73e8' : '#ffffff';
+          const weight = isSelected ? 2.5 : 0.8;
+
+          let shape;
+          if (p.isOctagon) {
+            // Octagonal Lemmons Center (#28)
+            const hw = w / 2, hh = h / 2, cut = 5;
+            const pts = [
+              pdfToLatLng(p.x - hw + cut, p.y - hh),
+              pdfToLatLng(p.x + hw - cut, p.y - hh),
+              pdfToLatLng(p.x + hw, p.y - hh + cut),
+              pdfToLatLng(p.x + hw, p.y + hh - cut),
+              pdfToLatLng(p.x + hw - cut, p.y + hh),
+              pdfToLatLng(p.x - hw + cut, p.y + hh),
+              pdfToLatLng(p.x - hw, p.y + hh - cut),
+              pdfToLatLng(p.x - hw, p.y - hh + cut)
+            ];
+            shape = L.polygon(pts, {
+              color: border, weight, opacity, fillColor: fill, fillOpacity: opacity, interactive: true
+            });
+          } else {
+            const bounds = [
+              pdfToLatLng(p.x - w / 2, p.y + h / 2),
+              pdfToLatLng(p.x + w / 2, p.y - h / 2)
+            ];
+            shape = L.rectangle(bounds, {
+              color: border,
+              weight,
+              opacity,
+              fillColor: fill,
+              fillOpacity: p.isField ? 0.05 : opacity,
+              interactive: true
+            });
+          }
+
+          shape.bindTooltip(`#${p.num} • ${p.name}`, { direction: 'top', className: 'gfu-tip' });
+          shape.on('click', function (e) {
+            L.DomEvent.stopPropagation(e);
+            if (isTapPinMode) {
+              setSimulatedStart(p.x, p.y, `${p.name} (#${p.num})`);
+              cancelTapPinMode();
+              return;
+            }
+            selectPlace(p);
+          });
+          shape.addTo(buildingsLayer);
+
+          // Centered Building Number
+          if (matches || activeFilterCat === 'all') {
+            const labelCls = p.isField ? 'field' : (p.cat === 'facility' ? 'facility' : 'housing');
+            L.marker(pdfToLatLng(p.x, p.y), {
+              icon: L.divIcon({
+                className: '',
+                html: `<div class="bldg-label ${labelCls}" style="transform:translate(-50%,-50%)">${p.num}</div>`,
+                iconSize: [0, 0]
+              }),
+              interactive: false,
+              zIndexOffset: 200
+            }).addTo(buildingsLayer);
+          }
+
+          // Official Custom SVG Micro-Icons (AED Red Heart+Bolt, Cyan Baby, Pink Mother+Baby)
+          if (matches || activeFilterCat === 'all') {
+            if (p.aed) {
+              const ax = p.x + w / 2 - 1.5;
+              const ay = p.y - h / 2 + 1.5;
+              L.marker(pdfToLatLng(ax, ay), {
+                icon: L.divIcon({
+                  className: '',
+                  html: `<svg width="16" height="16" viewBox="0 0 24 24" style="transform:translate(-50%,-50%);filter:drop-shadow(0 1px 1.5px rgba(0,0,0,0.45))">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#ed1c24" stroke="#ffffff" stroke-width="1.6"/>
+                    <path d="M13 7L9.5 13h2.5l-1 5 3.5-6H12l1-5z" fill="#ffffff"/>
+                  </svg>`,
+                  iconSize: [0, 0]
+                }),
+                interactive: false,
+                zIndexOffset: 350
+              }).addTo(lotsAndIconsLayer);
+            }
+
+            if (p.baby) {
+              const bx = p.x - w / 2 + 1.5;
+              const by = p.y + h / 2 - 1.5;
+              L.marker(pdfToLatLng(bx, by), {
+                icon: L.divIcon({
+                  className: '',
+                  html: `<svg width="16" height="16" viewBox="0 0 24 24" style="transform:translate(-50%,-50%);filter:drop-shadow(0 1px 1.5px rgba(0,0,0,0.45))">
+                    <circle cx="12" cy="12" r="10.5" fill="#4dc6f4" stroke="#ffffff" stroke-width="1.6"/>
+                    <circle cx="12" cy="7.5" r="2.3" fill="#ffffff"/>
+                    <path d="M8.5 11.5h7v4h-2v3.5h-3v-3.5h-2v-4z" fill="#ffffff"/>
+                  </svg>`,
+                  iconSize: [0, 0]
+                }),
+                interactive: false,
+                zIndexOffset: 350
+              }).addTo(lotsAndIconsLayer);
+            }
+
+            if (p.mother) {
+              const mx = p.x - w / 2 + 1.5;
+              const my = p.y - h / 2 + 1.5;
+              L.marker(pdfToLatLng(mx, my), {
+                icon: L.divIcon({
+                  className: '',
+                  html: `<svg width="16" height="16" viewBox="0 0 24 24" style="transform:translate(-50%,-50%);filter:drop-shadow(0 1px 1.5px rgba(0,0,0,0.45))">
+                    <circle cx="12" cy="12" r="10.5" fill="#f140a9" stroke="#ffffff" stroke-width="1.6"/>
+                    <circle cx="10.5" cy="7.2" r="2.1" fill="#ffffff"/>
+                    <path d="M7.5 11.2c0-1.1.9-2 2-2h2c1.1 0 2 .9 2 2v3.8h-1.5v4h-3v-4H7.5v-3.8z" fill="#ffffff"/>
+                    <circle cx="15.5" cy="11.5" r="1.4" fill="#ffffff"/>
+                    <path d="M14 13.5h3v3.5h-3v-3.5z" fill="#ffffff"/>
+                  </svg>`,
+                  iconSize: [0, 0]
+                }),
+                interactive: false,
+                zIndexOffset: 350
+              }).addTo(lotsAndIconsLayer);
+            }
+          }
+        } else if (p.cat === 'parking' && (matches || activeFilterCat === 'all')) {
+          const lotMarker = L.marker(pdfToLatLng(p.x, p.y), {
+            icon: L.divIcon({
+              className: '',
+              html: `<div class="lot-badge" style="${isSelected ? 'transform:scale(1.25);border-color:#38bdf8;' : ''}">${p.num}</div>`,
+              iconSize: [22, 22],
+              iconAnchor: [11, 11]
+            }),
+            zIndexOffset: 400
+          });
+          lotMarker.bindTooltip(p.name, { direction: 'top', offset: [0, -10], className: 'gfu-tip' });
+          lotMarker.on('click', function (e) {
+            L.DomEvent.stopPropagation(e);
+            if (isTapPinMode) {
+              setSimulatedStart(p.x, p.y, p.name);
+              cancelTapPinMode();
+              return;
+            }
+            selectPlace(p);
+          });
+          lotMarker.addTo(lotsAndIconsLayer);
+        }
+      });
+
+      // Official Green Visitor (V) Badges from PDF
+      if (activeFilterCat === 'all' || activeFilterCat === 'parking') {
+        const visitorSpots = [
+          { x: 171.1, y: 268.6, label: 'Visitor Parking Row — Lot A (Bauman/Ross)', lotId: 'lotA' },
+          { x: 381.5, y: 250.8, label: 'Visitor Parking Row — Lot B (Wheeler/Le Shana)', lotId: 'lotB' },
+          { x: 432.1, y: 404.3, label: 'Visitor Parking Row — Lot F (Roberts Center)', lotId: 'lotF' },
+          { x: 44.3,  y: 458.3, label: 'Visitor Parking Row — Lot E (Stevens Center)', lotId: 'lotE' }
+        ];
+        visitorSpots.forEach(v => {
+          const vm = L.marker(pdfToLatLng(v.x, v.y), {
+            icon: L.divIcon({
+              className: '',
+              html: `<div class="visitor-badge">V</div>`,
+              iconSize: [23, 23],
+              iconAnchor: [11.5, 11.5]
+            }),
+            zIndexOffset: 420
+          });
+          vm.bindTooltip(v.label, { direction: 'top', offset: [0, -10], className: 'gfu-tip' });
+          vm.on('click', function (e) {
+            L.DomEvent.stopPropagation(e);
+            const targetLot = PLACES.find(item => item.id === v.lotId);
+            if (targetLot) selectPlace(targetLot);
+          });
+          vm.addTo(lotsAndIconsLayer);
+        });
       }
-      if (p.baby) {
-        const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-        c.setAttribute("cx", p.x - w/2 + 1); c.setAttribute("cy", p.y + h/2 - 1);
-        c.setAttribute("r", "2.3"); c.setAttribute("fill", "#4dc6f4"); c.setAttribute("stroke", "#fff"); c.setAttribute("stroke-width", "0.4");
-        aLayer.appendChild(c);
+    }
+
+    function setFilterCategory(cat) {
+      activeFilterCat = cat;
+      document.querySelectorAll('.cat-chip').forEach(btn => {
+        const isCurrent = btn.dataset.cat === cat;
+        if (isCurrent) {
+          btn.className = 'cat-chip shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold shadow-xs border transition bg-[#112856] text-white border-[#112856] flex items-center gap-1.5';
+        } else {
+          btn.className = 'cat-chip shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold shadow-xs border transition bg-white/95 text-slate-700 border-slate-200 hover:bg-slate-50 flex items-center gap-1.5';
+        }
+      });
+
+      renderBuildingsAndIcons();
+
+      if (cat === 'offcampus') {
+        openOffCampusModal();
       }
-    } else if (p.cat === "parking") {
-      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-      g.style.cursor = "pointer";
-      g.addEventListener("click", (e) => { e.stopPropagation(); selectPlace(p); });
-      const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-      c.setAttribute("cx", p.x); c.setAttribute("cy", p.y); c.setAttribute("r", "4.8");
-      c.setAttribute("fill", "#112856"); c.setAttribute("stroke", "#ffffff"); c.setAttribute("stroke-width", "0.6");
-      g.appendChild(c);
-      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      t.setAttribute("x", p.x); t.setAttribute("y", p.y + 2); t.setAttribute("text-anchor", "middle");
-      t.setAttribute("font-size", "5.8"); t.setAttribute("font-weight", "800"); t.setAttribute("fill", "#ffffff");
-      t.textContent = p.num;
-      g.appendChild(t);
-      lLayer.appendChild(g);
     }
-  });
 
-  // Green Visitor (V) Badges from Official PDF
-  const visitorPts = [[171.1,268.6],[381.5,250.8],[432.1,404.3],[44.3,458.3]];
-  visitorPts.forEach(([vx, vy]) => {
-    const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    c.setAttribute("cx", vx); c.setAttribute("cy", vy); c.setAttribute("r", "5.2");
-    c.setAttribute("fill", "#7ac143"); c.setAttribute("stroke", "#112856"); c.setAttribute("stroke-width", "0.6");
-    lLayer.appendChild(c);
-    const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    t.setAttribute("x", vx); t.setAttribute("y", vy + 2.1); t.setAttribute("text-anchor", "middle");
-    t.setAttribute("font-size", "6"); t.setAttribute("font-weight", "800"); t.setAttribute("fill", "#112856");
-    t.textContent = "V";
-    lLayer.appendChild(t);
-  });
-}
+    /**
+     * ============================================================================
+     * 8. LIVE PHONE GPS (NEWBERG, OR) & SIMULATED START CONTROLS
+     * ============================================================================
+     */
+    function startNewbergGeolocation() {
+      if (!('geolocation' in navigator)) {
+        updateGpsPill(false, 'GPS Off • Start: Visitor Lot V');
+        return;
+      }
 
-function renderUserMarker() {
-  const gLayer = document.getElementById("layer-gps");
-  gLayer.innerHTML = "";
-  if (!state.userPdf) return;
-  const [ux, uy] = state.userPdf;
+      navigator.geolocation.watchPosition(
+        (pos) => {
+          const { latitude, longitude, accuracy } = pos.coords;
+          const isOnOrNearCampus =
+            latitude > 45.290 && latitude < 45.325 &&
+            longitude > -122.988 && longitude < -122.950;
 
-  const pulse = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-  pulse.setAttribute("cx", ux); pulse.setAttribute("cy", uy); pulse.setAttribute("r", "7");
-  pulse.setAttribute("fill", "rgba(26,115,232,0.32)"); pulse.setAttribute("class", "gps-pulse");
-  gLayer.appendChild(pulse);
+          if (isOnOrNearCampus) {
+            const pdfPt = latLngToPdf(latitude, longitude);
+            liveNewbergGps = {
+              x: pdfPt.x,
+              y: pdfPt.y,
+              label: `My Live Phone GPS (±${Math.round(accuracy || 12)}m)`,
+              isLiveGps: true,
+              accuracyMeters: Math.round(accuracy || 12)
+            };
 
-  const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-  dot.setAttribute("cx", ux); dot.setAttribute("cy", uy); dot.setAttribute("r", "4.2");
-  dot.setAttribute("fill", "#1a73e8"); dot.setAttribute("stroke", "#ffffff"); dot.setAttribute("stroke-width", "1.4");
-  gLayer.appendChild(dot);
-}
+            userLocation = liveNewbergGps;
+            renderUserGpsMarker();
+            updateGpsPill(true, `Live GPS (±${userLocation.accuracyMeters}m)`);
 
-// Dijkstra Shortest Walking Path on Campus Footpath Graph
-function computeRoute(startPt, endPt) {
-  const adj = {};
-  Object.keys(NODES).forEach(k => adj[k] = []);
-  EDGES.forEach(([u, v]) => {
-    const d = Math.hypot(NODES[u][0]-NODES[v][0], NODES[u][1]-NODES[v][1]);
-    adj[u].push([v, d]); adj[v].push([u, d]);
-  });
-
-  function nearestNode(pt) {
-    let best = null, bestD = Infinity;
-    for (const [k, coord] of Object.entries(NODES)) {
-      const d = Math.hypot(coord[0]-pt[0], coord[1]-pt[1]);
-      if (d < bestD) { bestD = d; best = k; }
+            if (activeRoutePlace) {
+              calculateAndRenderWalkingRoute(activeRoutePlace, false);
+            }
+          } else {
+            updateGpsPill(false, 'Off-Campus • Start: Visitor Lot V');
+          }
+        },
+        () => {
+          updateGpsPill(false, 'GPS Off • Start: Visitor Lot V');
+        },
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+      );
     }
-    return best;
-  }
 
-  const sNode = nearestNode(startPt);
-  const eNode = nearestNode(endPt);
-  const dist = {}, prev = {}, visited = new Set();
-  Object.keys(NODES).forEach(k => dist[k] = Infinity);
-  dist[sNode] = 0;
-
-  while (visited.size < Object.keys(NODES).length) {
-    let u = null, minD = Infinity;
-    for (const k of Object.keys(NODES)) {
-      if (!visited.has(k) && dist[k] < minD) { minD = dist[k]; u = k; }
+    function updateGpsPill(isLive, text) {
+      const dot = document.getElementById('gpsIndicatorDot');
+      const label = document.getElementById('gpsIndicatorText');
+      dot.className = `w-2 h-2 rounded-full shrink-0 ${isLive ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`;
+      label.textContent = text;
     }
-    if (!u || u === eNode) break;
-    visited.add(u);
-    for (const [v, w] of adj[u]) {
-      if (dist[u] + w < dist[v]) { dist[v] = dist[u] + w; prev[v] = u; }
+
+    function renderUserGpsMarker() {
+      userGpsLayer.clearLayers();
+      if (!userLocation) return;
+
+      const latlng = pdfToLatLng(userLocation.x, userLocation.y);
+
+      L.circle(latlng, {
+        radius: 10,
+        color: '#1a73e8',
+        weight: 1.2,
+        opacity: 0.45,
+        fillColor: '#1a73e8',
+        fillOpacity: 0.14,
+        interactive: false
+      }).addTo(userGpsLayer);
+
+      const gpsMarker = L.marker(latlng, {
+        icon: L.divIcon({
+          className: '',
+          html: `<div class="gps-marker-wrap"><div class="gps-pulse-ring"></div><div class="gps-core-dot"></div></div>`,
+          iconSize: [28, 28],
+          iconAnchor: [14, 14]
+        }),
+        zIndexOffset: 2000
+      });
+
+      gpsMarker.bindTooltip(userLocation.label, { direction: 'top', offset: [0, -12], className: 'gfu-tip' });
+      gpsMarker.addTo(userGpsLayer);
     }
-  }
 
-  const path = [endPt];
-  let curr = eNode;
-  while (curr) { path.unshift(NODES[curr]); curr = prev[curr]; }
-  path.unshift(startPt);
-  return path;
-}
+    function setSimulatedStart(x, y, label) {
+      userLocation = {
+        x,
+        y,
+        label,
+        isLiveGps: false,
+        accuracyMeters: 10
+      };
+      renderUserGpsMarker();
+      updateGpsPill(false, `Start: ${label}`);
+      closeSimulateModal();
+      map.flyTo(pdfToLatLng(x, y), Math.max(map.getZoom(), 1.25), { duration: 0.55 });
+      showToast(`Start location set to ${label}`);
 
-function drawRouteTo(place) {
-  const rLayer = document.getElementById("layer-route");
-  rLayer.innerHTML = "";
-  const pts = computeRoute(state.userPdf, [place.x, place.y]);
-  const ptStr = pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
-
-  const casing = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-  casing.setAttribute("points", ptStr); casing.setAttribute("fill", "none");
-  casing.setAttribute("stroke", "#ffffff"); casing.setAttribute("stroke-width", "4.4");
-  casing.setAttribute("stroke-linecap", "round"); casing.setAttribute("stroke-linejoin", "round");
-  rLayer.appendChild(casing);
-
-  const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-  line.setAttribute("points", ptStr); line.setAttribute("fill", "none");
-  line.setAttribute("stroke", "#1a73e8"); line.setAttribute("stroke-width", "2.6");
-  line.setAttribute("stroke-linecap", "round"); line.setAttribute("stroke-linejoin", "round");
-  rLayer.appendChild(line);
-
-  // Destination Pin
-  const pin = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-  pin.setAttribute("cx", place.x); pin.setAttribute("cy", place.y); pin.setAttribute("r", "4.5");
-  pin.setAttribute("fill", "#ef4444"); pin.setAttribute("stroke", "#ffffff"); pin.setAttribute("stroke-width", "1.3");
-  rLayer.appendChild(pin);
-
-  // Calculate walking distance (~6.2 ft per PDF point) & minutes
-  let totalPts = 0;
-  for (let i = 1; i < pts.length; i++) totalPts += Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]);
-  const feet = Math.round(totalPts * 6.2);
-  const mins = Math.max(1, Math.round(feet / 260));
-  const usesWheeler = pts.some(p => Math.abs(p[0]-274)<5 && Math.abs(p[1]-266)<5);
-  const usesCrisman = pts.some(p => Math.abs(p[0]-274)<5 && Math.abs(p[1]-373)<5);
-
-  const stepsEl = document.getElementById("routeSteps");
-  let html = `<div class="step-row"><strong>${mins} min walk</strong> (${feet.toLocaleString()} ft) to <strong>${place.name}</strong></div>`;
-  if (usesWheeler) html += `<div class="step-row">🌉 Cross Hess Creek via <strong>Wheeler Bridge</strong></div>`;
-  if (usesCrisman) html += `<div class="step-row">🌉 Cross Hess Creek via <strong>Crisman Crossing</strong></div>`;
-  if (place.cat === "offcampus") {
-    html += `<div class="step-row">🚗 Off-campus site: <a href="https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}" target="_blank" style="color:#1a73e8;font-weight:600;">Open Turn-by-Turn Driving GPS</a></div>`;
-  }
-  stepsEl.innerHTML = html;
-  stepsEl.classList.add("open");
-  centerOnPdf(place.x, place.y, Math.max(state.scale, 1.45));
-}
-
-function selectPlace(p) {
-  state.selectedPlace = p;
-  document.getElementById("destTitle").textContent = (p.num !== "OFF" ? `#${p.num} ` : "") + p.name;
-  const extras = [p.aed ? "AED" : "", p.baby ? "Baby Changing" : "", p.mother ? "Mother's Room" : ""].filter(Boolean).join(" • ");
-  document.getElementById("destSub").textContent = `Grid ${p.grid} • ${p.cat.toUpperCase()}${extras ? " • " + extras : ""}`;
-  document.getElementById("destBadge").textContent = p.num;
-  document.getElementById("destBadge").style.background = p.cat === "housing" ? "#f68536" : "#112856";
-  document.getElementById("resultsDropdown").classList.remove("open");
-  renderMapLayers();
-  drawRouteTo(p);
-}
-
-// Pan & Zoom Controls (Mouse + Mobile Touch Pinch/Drag)
-function applyTransform() {
-  stageEl.style.transform = `translate(${state.tx}px, ${state.ty}px) scale(${state.scale})`;
-}
-function centerOnPdf(px, py, targetScale = state.scale) {
-  state.scale = Math.min(3.5, Math.max(0.55, targetScale));
-  const vw = viewportEl.clientWidth, vh = viewportEl.clientHeight;
-  const sx = ((px - 16) / 452) * 904;
-  const sy = ((py - 14) / 622) * 1244;
-  state.tx = vw / 2 - sx * state.scale;
-  state.ty = vh / 2 - sy * state.scale - 30;
-  applyTransform();
-}
-
-let dragging = false, lastX = 0, lastY = 0;
-viewportEl.addEventListener("pointerdown", e => {
-  if (state.tapToSetStart) {
-    const rect = stageEl.getBoundingClientRect();
-    const px = 16 + ((e.clientX - rect.left) / rect.width) * 452;
-    const py = 14 + ((e.clientY - rect.top) / rect.height) * 622;
-    state.userPdf = [Math.max(20, Math.min(460, px)), Math.max(20, Math.min(625, py))];
-    state.tapToSetStart = false;
-    document.getElementById("gpsLabel").textContent = "Simulated Pin on Map";
-    renderUserMarker();
-    if (state.selectedPlace) drawRouteTo(state.selectedPlace);
-    return;
-  }
-  dragging = true; lastX = e.clientX; lastY = e.clientY;
-  viewportEl.classList.add("grabbing");
-});
-window.addEventListener("pointermove", e => {
-  if (!dragging) return;
-  state.tx += e.clientX - lastX;
-  state.ty += e.clientY - lastY;
-  lastX = e.clientX; lastY = e.clientY;
-  applyTransform();
-});
-window.addEventListener("pointerup", () => { dragging = false; viewportEl.classList.remove("grabbing"); });
-viewportEl.addEventListener("wheel", e => {
-  e.preventDefault();
-  const factor = e.deltaY < 0 ? 1.15 : 0.87;
-  state.scale = Math.min(3.5, Math.max(0.55, state.scale * factor));
-  applyTransform();
-}, { passive: false });
-
-document.getElementById("zoomInBtn").onclick = () => { state.scale = Math.min(3.5, state.scale * 1.25); applyTransform(); };
-document.getElementById("zoomOutBtn").onclick = () => { state.scale = Math.max(0.55, state.scale * 0.8); applyTransform(); };
-document.getElementById("gpsBtn").onclick = () => { if (state.userPdf) centerOnPdf(state.userPdf[0], state.userPdf[1], 1.5); };
-document.getElementById("routeBtn").onclick = () => { if (state.selectedPlace) drawRouteTo(state.selectedPlace); };
-
-// Search & Category Filtering
-const searchInput = document.getElementById("searchInput");
-const resultsDropdown = document.getElementById("resultsDropdown");
-function updateSearchList() {
-  const q = searchInput.value.trim().toLowerCase();
-  const filtered = PLACES.filter(p => {
-    const catMatch = state.activeCat === "all"
-      || (state.activeCat === "aed" && (p.aed || p.baby || p.mother))
-      || p.cat === state.activeCat;
-    if (!catMatch) return false;
-    if (!q) return state.activeCat !== "all";
-    return p.name.toLowerCase().includes(q) || p.num.toLowerCase() === q || p.grid.toLowerCase().includes(q);
-  });
-  if (!filtered.length) { resultsDropdown.classList.remove("open"); return; }
-  resultsDropdown.innerHTML = filtered.slice(0, 30).map(p => `
-    <div class="res-item" data-id="${p.id}">
-      <div class="res-num" style="background:${p.cat === 'housing' ? '#f68536' : '#112856'}">${p.num}</div>
-      <div class="res-meta">
-        <div class="res-title">${p.name}</div>
-        <div class="res-sub">Grid ${p.grid} • ${p.cat}${p.aed ? ' • AED' : ''}${p.baby ? ' • Baby Changing' : ''}${p.mother ? " • Mother's Room" : ''}</div>
-      </div>
-    </div>
-  `).join("");
-  resultsDropdown.querySelectorAll(".res-item").forEach(el => {
-    el.onclick = () => selectPlace(PLACES.find(x => x.id === el.dataset.id));
-  });
-  resultsDropdown.classList.add("open");
-}
-searchInput.addEventListener("input", updateSearchList);
-searchInput.addEventListener("focus", updateSearchList);
-document.querySelectorAll(".chip").forEach(ch => {
-  ch.onclick = () => {
-    document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
-    ch.classList.add("active");
-    state.activeCat = ch.dataset.cat;
-    updateSearchList();
-  };
-});
-
-// Legend & Simulate Start Modal
-const modalBackdrop = document.getElementById("modalBackdrop");
-const modalContent = document.getElementById("modalContent");
-modalBackdrop.onclick = e => { if (e.target === modalBackdrop) modalBackdrop.classList.remove("open"); };
-
-document.getElementById("legendBtn").onclick = () => {
-  modalContent.innerHTML = `
-    <h3>Official George Fox Campus Map Key</h3>
-    <div class="legend-grid">
-      <div class="legend-item"><span class="swatch" style="background:#112856"></span>Campus Facilities (1–58)</div>
-      <div class="legend-item"><span class="swatch" style="background:#f68536"></span>Student Housing (59–98)</div>
-      <div class="legend-item"><span class="swatch" style="background:#112856;border-radius:50%"></span>Parking Lots (A–J)</div>
-      <div class="legend-item"><span class="swatch" style="background:#7ac143;border-radius:50%"></span>Visitor Lots / Rows (V)</div>
-      <div class="legend-item"><span class="swatch" style="background:#ed1c24;border-radius:50%"></span>Automated External Defibrillator</div>
-      <div class="legend-item"><span class="swatch" style="background:#4dc6f4;border-radius:50%"></span>Baby Changing Station</div>
-      <div class="legend-item"><span class="swatch" style="background:#f140a9;border-radius:50%"></span>Mother's Room (Murdock 201)</div>
-      <div class="legend-item"><span class="swatch" style="background:#6ba2dc"></span>Hess Creek / Footbridges</div>
-    </div>
-    <button class="btn-primary" style="margin-top:14px;width:100%;" onclick="document.getElementById('modalBackdrop').classList.remove('open')">Close Legend</button>
-  `;
-  modalBackdrop.classList.add("open");
-};
-
-function openSimulateModal() {
-  const presets = [
-    {label:"Visitor Lot V — Bauman / Ross (C7)", pt:[171.1,268.6]},
-    {label:"Visitor Lot V — Wheeler / Le Shana (F7)", pt:[381.5,250.8]},
-    {label:"Visitor Lot V — Roberts Center (G4)", pt:[432.1,404.3]},
-    {label:"Visitor Lot V — Stevens / Meridian (B3)", pt:[44.3,458.3]},
-    {label:"Parking Lot D — Pennington Hall (D3)", pt:[208.2,465.0]},
-    {label:"Canyon Commons (#12)", pt:[339.0,346.0]}
-  ];
-  modalContent.innerHTML = `
-    <h3>Choose Starting Point</h3>
-    <p style="font-size:13px;color:#5a6577;margin-top:0;">If you are on campus in Newberg, live phone GPS updates automatically. Off-campus visitors can test routing from any lot:</p>
-    <button class="btn-primary" style="width:100%;margin-bottom:8px;" id="tapStartBtn">👆 Tap Anywhere on the Campus Map</button>
-    ${presets.map((pr, idx) => `<button class="btn-secondary" style="width:100%;margin-bottom:6px;text-align:left;" data-pidx="${idx}">${pr.label}</button>`).join("")}
-  `;
-  document.getElementById("tapStartBtn").onclick = () => {
-    state.tapToSetStart = true;
-    document.getElementById("gpsLabel").textContent = "Tap any spot on map…";
-    modalBackdrop.classList.remove("open");
-  };
-  modalContent.querySelectorAll("[data-pidx]").forEach(btn => {
-    btn.onclick = () => {
-      const pr = presets[Number(btn.dataset.pidx)];
-      state.userPdf = pr.pt;
-      document.getElementById("gpsDot").className = "dot-sim";
-      document.getElementById("gpsLabel").textContent = "Start: " + pr.label.split("—")[0].trim();
-      renderUserMarker();
-      if (state.selectedPlace) drawRouteTo(state.selectedPlace);
-      modalBackdrop.classList.remove("open");
-    };
-  });
-  modalBackdrop.classList.add("open");
-}
-document.getElementById("simBtn").onclick = openSimulateModal;
-document.getElementById("gpsStatusPill").onclick = openSimulateModal;
-
-// Real-World Phone GPS Watcher (Newberg, OR)
-if ("geolocation" in navigator) {
-  navigator.geolocation.watchPosition(pos => {
-    const { latitude, longitude, accuracy } = pos.coords;
-    // Check if user is within ~1.5 miles of George Fox University in Newberg
-    if (latitude > 45.290 && latitude < 45.325 && longitude > -122.988 && longitude < -122.950) {
-      state.isLiveGps = true;
-      state.userPdf = latLngToPdf(latitude, longitude);
-      document.getElementById("gpsDot").className = "dot-live";
-      document.getElementById("gpsLabel").textContent = `Live GPS (±${Math.round(accuracy)}m)`;
-      renderUserMarker();
-      if (state.selectedPlace) drawRouteTo(state.selectedPlace);
-    } else {
-      document.getElementById("gpsLabel").textContent = "Off-Campus • Simulated Start (Lot V)";
+      if (activeRoutePlace) {
+        calculateAndRenderWalkingRoute(activeRoutePlace, true);
+      }
     }
-  }, () => {
-    document.getElementById("gpsLabel").textContent = "GPS Off • Simulated Start (Lot V)";
-  }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 });
-}
 
-// Initialize Map
-renderMapLayers();
-renderUserMarker();
-centerOnPdf(235, 365, 0.92);
-</script>
+    function activateRealPhoneGps() {
+      closeSimulateModal();
+      if (liveNewbergGps) {
+        userLocation = liveNewbergGps;
+        renderUserGpsMarker();
+        updateGpsPill(true, `Live GPS (±${userLocation.accuracyMeters}m)`);
+        map.flyTo(pdfToLatLng(userLocation.x, userLocation.y), 1.5, { duration: 0.6 });
+        if (activeRoutePlace) calculateAndRenderWalkingRoute(activeRoutePlace, true);
+        return;
+      }
+
+      showToast('Checking phone GPS in Newberg, OR...');
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude, accuracy } = pos.coords;
+          if (latitude > 45.290 && latitude < 45.325 && longitude > -122.988 && longitude < -122.950) {
+            const pt = latLngToPdf(latitude, longitude);
+            liveNewbergGps = { x: pt.x, y: pt.y, label: 'My Live Phone GPS', isLiveGps: true, accuracyMeters: Math.round(accuracy || 12) };
+            userLocation = liveNewbergGps;
+            renderUserGpsMarker();
+            updateGpsPill(true, `Live GPS (±${userLocation.accuracyMeters}m)`);
+            map.flyTo(pdfToLatLng(pt.x, pt.y), 1.5, { duration: 0.6 });
+            if (activeRoutePlace) calculateAndRenderWalkingRoute(activeRoutePlace, true);
+          } else {
+            showToast('You are currently outside Newberg campus—use Simulated Start presets.');
+          }
+        },
+        () => showToast('Location access unavailable. Choose a campus preset.'),
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    }
+
+    function enableTapPinMode() {
+      closeSimulateModal();
+      isTapPinMode = true;
+      document.getElementById('tapPinBanner').classList.remove('hidden');
+    }
+
+    function cancelTapPinMode() {
+      isTapPinMode = false;
+      document.getElementById('tapPinBanner').classList.add('hidden');
+    }
+
+    function centerOnUserPin() {
+      if (!userLocation) return;
+      map.flyTo(pdfToLatLng(userLocation.x, userLocation.y), Math.max(map.getZoom(), 1.5), { duration: 0.55 });
+      showToast(`Centered on ${userLocation.label}`);
+    }
+
+    function recenterFullCampus() {
+      map.flyToBounds(CAMPUS_VIEW_BOUNDS, { duration: 0.6 });
+    }
+
+    /**
+     * ============================================================================
+     * 9. SEARCH AUTOCOMPLETE & DESTINATION CARD
+     * ============================================================================
+     */
+    function setupSearchListeners() {
+      const input = document.getElementById('searchInput');
+      const clearBtn = document.getElementById('clearSearchBtn');
+
+      input.addEventListener('focus', () => {
+        document.getElementById('leadingLogo').classList.add('hidden');
+        document.getElementById('leadingBack').classList.remove('hidden');
+        runSearchQuery(input.value);
+      });
+
+      input.addEventListener('input', (e) => {
+        const val = e.target.value;
+        clearBtn.classList.toggle('hidden', val.length === 0);
+        runSearchQuery(val);
+      });
+    }
+
+    function handleLeadingBtnClick() {
+      const resBox = document.getElementById('searchResults');
+      if (!resBox.classList.contains('hidden')) {
+        hideSearchResults();
+        document.getElementById('searchInput').blur();
+      } else {
+        recenterFullCampus();
+      }
+    }
+
+    function clearSearchInput() {
+      const input = document.getElementById('searchInput');
+      input.value = '';
+      document.getElementById('clearSearchBtn').classList.add('hidden');
+      runSearchQuery('');
+      input.focus();
+    }
+
+    function hideSearchResults() {
+      document.getElementById('searchResults').classList.add('hidden');
+      document.getElementById('leadingLogo').classList.remove('hidden');
+      document.getElementById('leadingBack').classList.add('hidden');
+    }
+
+    function runSearchQuery(raw) {
+      const box = document.getElementById('searchResults');
+      const q = raw.trim().toLowerCase().replace(/^#/, '');
+
+      let matches = [];
+      if (!q) {
+        const featuredIds = ['41', '12', '46', '8', '21', '27', '18', '50', 'lotA', 'lotF'];
+        matches = featuredIds.map(id => PLACES.find(p => p.id === id)).filter(Boolean);
+      } else {
+        matches = PLACES.filter(p => {
+          const numHit = p.num.toLowerCase() === q || p.num.toLowerCase().startsWith(q);
+          const nameHit = p.name.toLowerCase().includes(q);
+          const gridHit = p.grid.toLowerCase() === q;
+          const aedHit = (q === 'aed' || q === 'heart' || q === 'defibrillator') && p.aed;
+          const babyHit = (q.includes('baby') || q.includes('changing')) && Boolean(p.baby);
+          const motherHit = (q.includes('mother') || q.includes('nursing') || q.includes('lactation')) && Boolean(p.mother);
+          const visitorHit = q.includes('visitor') && p.visitor;
+          return numHit || nameHit || gridHit || aedHit || babyHit || motherHit || visitorHit;
+        }).sort((a, b) => {
+          if (a.num.toLowerCase() === q && b.num.toLowerCase() !== q) return -1;
+          if (b.num.toLowerCase() === q && a.num.toLowerCase() !== q) return 1;
+          return a.name.localeCompare(b.name);
+        }).slice(0, 20);
+      }
+
+      if (!matches.length) {
+        box.innerHTML = `<div class="p-4 text-center text-xs text-slate-500">No campus buildings or parking lots matched "<strong>${escapeHtml(raw)}</strong>".</div>`;
+      } else {
+        const header = !q ? `<div class="px-3.5 py-1.5 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400">Popular Visitor Destinations</div>` : '';
+        box.innerHTML = header + matches.map(p => {
+          const badgeStyle =
+            p.cat === 'housing' ? 'bg-[#f68536] text-[#112856]' :
+            p.visitor ? 'bg-[#7ac143] text-[#112856] border border-[#112856]' : 'bg-[#112856] text-white';
+
+          const distFt = Math.round(Math.hypot(p.x - userLocation.x, p.y - userLocation.y) * 6.2);
+          const rightInfo = p.cat === 'offcampus' ? p.grid : `${distFt.toLocaleString()} ft`;
+
+          return `
+            <button onclick="selectPlaceById('${p.id}')" class="w-full text-left px-3.5 py-2.5 hover:bg-blue-50/70 active:bg-blue-100/70 flex items-center justify-between gap-3 transition">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <span class="min-w-[28px] h-7 px-1 rounded-lg ${badgeStyle} font-extrabold text-[11px] flex items-center justify-center shrink-0">${p.num}</span>
+                <div class="min-w-0">
+                  <div class="text-xs sm:text-sm font-bold text-slate-900 truncate">${p.name}</div>
+                  <div class="text-[11px] text-slate-500 truncate">
+                    Grid ${p.grid} • ${p.cat === 'facility' ? 'Facility' : p.cat === 'housing' ? 'Housing' : p.cat === 'parking' ? 'Parking' : 'Off-Campus'}
+                    ${p.aed ? ' • AED' : ''}${p.baby ? ' • Baby Changing' : ''}${p.mother ? " • Mother's Room" : ''}
+                  </div>
+                </div>
+              </div>
+              <span class="text-[11px] font-semibold text-slate-400 shrink-0">${rightInfo}</span>
+            </button>
+          `;
+        }).join('');
+      }
+
+      box.classList.remove('hidden');
+    }
+
+    function selectPlaceById(id) {
+      const p = PLACES.find(item => item.id === id);
+      if (p) selectPlace(p);
+    }
+
+    function selectPlace(p) {
+      hideSearchResults();
+      document.getElementById('searchInput').blur();
+
+      if (!placeMatchesFilter(p, activeFilterCat)) {
+        setFilterCategory('all');
+      }
+
+      selectedPlace = p;
+      renderBuildingsAndIcons();
+      updateDestinationCard(p);
+
+      // Center map cleanly above bottom card
+      map.flyTo(pdfToLatLng(p.x, p.y + 42), Math.max(map.getZoom(), 1.35), { duration: 0.6 });
+
+      if (activeRoutePlace) {
+        activeRoutePlace = p;
+        calculateAndRenderWalkingRoute(p, true);
+      }
+    }
+
+    function updateDestinationCard(p) {
+      const badge = document.getElementById('cardBadge');
+      badge.textContent = p.num;
+      badge.className = `min-w-[40px] h-10 px-2 rounded-2xl font-extrabold text-sm flex items-center justify-center shrink-0 shadow-xs ${
+        p.cat === 'housing' ? 'bg-[#f68536] text-[#112856]' :
+        p.visitor ? 'bg-[#7ac143] text-[#112856] border-2 border-[#112856]' : 'bg-[#112856] text-white'
+      }`;
+
+      document.getElementById('cardTitle').textContent = (p.num !== 'OFF' && p.cat !== 'parking' ? `#${p.num} ` : '') + p.name;
+
+      const tags = [
+        `Grid ${p.grid}`,
+        p.cat === 'facility' ? 'Campus Facility' : p.cat === 'housing' ? 'Student Housing' : p.cat === 'parking' ? (p.visitor ? 'Visitor & Campus Lot' : 'Permit Lot') : 'Off-Campus Site',
+        p.aed ? 'AED' : '',
+        p.baby ? `Baby Changing (${p.baby})` : '',
+        p.mother ? `Mother's Room (${p.mother})` : ''
+      ].filter(Boolean).join(' • ');
+
+      document.getElementById('cardSub').textContent = tags;
+    }
+
+    function setSelectedPlaceAsStart() {
+      if (!selectedPlace) return;
+      const prefix = selectedPlace.cat === 'parking' ? '' : `#${selectedPlace.num} `;
+      setSimulatedStart(selectedPlace.x, selectedPlace.y, `${prefix}${selectedPlace.name}`);
+    }
+
+    function routeToSelectedPlace() {
+      if (!selectedPlace) return;
+      activeRoutePlace = selectedPlace;
+      calculateAndRenderWalkingRoute(selectedPlace, true);
+    }
+
+    function clearActiveRoute() {
+      activeRoutePlace = null;
+      routeLayer.clearLayers();
+      document.getElementById('routeDrawer').classList.add('hidden');
+      document.getElementById('clearRouteBtn').classList.add('hidden');
+      document.getElementById('rightControls').style.bottom = '144px';
+      showToast('Navigation ended');
+    }
+
+    function toggleStepsVisibility() {
+      isStepsExpanded = !isStepsExpanded;
+      const box = document.getElementById('routeStepsContainer');
+      const btn = document.getElementById('toggleStepsBtn');
+      box.classList.toggle('hidden', !isStepsExpanded);
+      btn.textContent = isStepsExpanded ? 'Hide Steps' : 'Show Steps';
+    }
+
+    /**
+     * ============================================================================
+     * 10. DIJKSTRA SHORTEST-PATH CAMPUS FOOTPATH & BRIDGE ROUTING ENGINE
+     * ============================================================================
+     */
+    function calculateAndRenderWalkingRoute(dest, fitBounds) {
+      routeLayer.clearLayers();
+
+      const startPt = { x: userLocation.x, y: userLocation.y };
+      const endPt = { x: dest.x, y: dest.y };
+
+      // Build adjacency graph
+      const adj = {};
+      Object.keys(GRAPH_NODES).forEach(k => { adj[k] = []; });
+      GRAPH_EDGES.forEach(([u, v]) => {
+        const nu = GRAPH_NODES[u], nv = GRAPH_NODES[v];
+        const d = Math.hypot(nu.x - nv.x, nu.y - nv.y);
+        adj[u].push({ to: v, w: d });
+        adj[v].push({ to: u, w: d });
+      });
+
+      function findNearestGraphNode(pt) {
+        let bestId = null, bestDist = Infinity;
+        for (const [id, node] of Object.entries(GRAPH_NODES)) {
+          const d = Math.hypot(node.x - pt.x, node.y - pt.y);
+          if (d < bestDist) {
+            bestDist = d;
+            bestId = id;
+          }
+        }
+        return bestId;
+      }
+
+      const startNodeId = findNearestGraphNode(startPt);
+      const endNodeId = findNearestGraphNode(endPt);
+
+      const dist = {};
+      const prev = {};
+      const visited = new Set();
+      Object.keys(GRAPH_NODES).forEach(k => { dist[k] = Infinity; prev[k] = null; });
+      dist[startNodeId] = 0;
+
+      while (visited.size < Object.keys(GRAPH_NODES).length) {
+        let u = null, minD = Infinity;
+        for (const k of Object.keys(GRAPH_NODES)) {
+          if (!visited.has(k) && dist[k] < minD) {
+            minD = dist[k];
+            u = k;
+          }
+        }
+        if (!u || u === endNodeId) break;
+        visited.add(u);
+
+        for (const edge of adj[u]) {
+          const alt = dist[u] + edge.w;
+          if (alt < dist[edge.to]) {
+            dist[edge.to] = alt;
+            prev[edge.to] = u;
+          }
+        }
+      }
+
+      const nodeSequence = [];
+      let curr = endNodeId;
+      while (curr) {
+        nodeSequence.unshift({ id: curr, ...GRAPH_NODES[curr] });
+        curr = prev[curr];
+      }
+
+      const fullPts = [startPt, ...nodeSequence, endPt];
+      const latLngs = fullPts.map(pt => pdfToLatLng(pt.x, pt.y));
+
+      // White outer casing + Google Maps Blue (#1a73e8) route polyline
+      L.polyline(latLngs, {
+        color: '#ffffff',
+        weight: 9,
+        opacity: 0.96,
+        lineCap: 'round',
+        lineJoin: 'round',
+        interactive: false
+      }).addTo(routeLayer);
+
+      const mainPolyline = L.polyline(latLngs, {
+        color: '#1a73e8',
+        weight: 5.5,
+        opacity: 1,
+        lineCap: 'round',
+        lineJoin: 'round',
+        interactive: false
+      }).addTo(routeLayer);
+
+      // Destination Halo Ring
+      L.circleMarker(pdfToLatLng(dest.x, dest.y), {
+        radius: 13,
+        color: '#1a73e8',
+        weight: 2.5,
+        fillColor: '#1a73e8',
+        fillOpacity: 0.18,
+        interactive: false
+      }).addTo(routeLayer);
+
+      // Calculate total distance (~6.2 ft per PDF unit) & walking minutes
+      let totalPdfUnits = 0;
+      for (let i = 1; i < fullPts.length; i++) {
+        totalPdfUnits += Math.hypot(fullPts[i].x - fullPts[i - 1].x, fullPts[i].y - fullPts[i - 1].y);
+      }
+      const totalFeet = Math.max(40, Math.round(totalPdfUnits * 6.2));
+      const walkMins = Math.max(1, Math.round(totalFeet / 260));
+
+      // Build human-friendly turn-by-turn steps
+      const steps = [];
+      const firstWalkFt = Math.round(Math.hypot(nodeSequence[0].x - startPt.x, nodeSequence[0].y - startPt.y) * 6.2);
+      if (firstWalkFt > 25) {
+        steps.push({ icon: '🚶', text: `Head toward ${nodeSequence[0].label}`, dist: `${firstWalkFt} ft` });
+      }
+
+      for (let i = 0; i < nodeSequence.length - 1; i++) {
+        const a = nodeSequence[i];
+        const b = nodeSequence[i + 1];
+        const segFt = Math.round(Math.hypot(b.x - a.x, b.y - a.y) * 6.2);
+
+        if ((a.id === 'n_whe_w' && b.id === 'n_whe_e') || (a.id === 'n_whe_e' && b.id === 'n_whe_w')) {
+          steps.push({ icon: '🌉', text: 'Cross Hess Creek via Wheeler Bridge', dist: `${segFt} ft` });
+        } else if ((a.id === 'n_cri_w' && b.id === 'n_cri_e') || (a.id === 'n_cri_e' && b.id === 'n_cri_w')) {
+          steps.push({ icon: '🌉', text: 'Cross Hess Creek via Crisman Crossing', dist: `${segFt} ft` });
+        } else {
+          steps.push({ icon: '↗️', text: `Continue along ${b.label}`, dist: `${segFt} ft` });
+        }
+      }
+
+      if (dest.cat === 'offcampus') {
+        steps.push({
+          icon: '🚗',
+          text: `Off-campus facility: <a href="https://www.google.com/maps/dir/?api=1&destination=${dest.lat},${dest.lng}" target="_blank" rel="noopener noreferrer" class="text-[#1a73e8] font-bold underline">Open Turn-by-Turn Driving GPS</a>`,
+          dist: dest.grid
+        });
+      } else {
+        steps.push({
+          icon: '📍',
+          text: `Arrive at ${dest.name} (${dest.cat === 'parking' ? 'Lot ' + dest.num : '#' + dest.num})`,
+          dist: ''
+        });
+      }
+
+      document.getElementById('routeTimeText').textContent = `${walkMins} min walk`;
+      document.getElementById('routeDistText').textContent = `(${totalFeet.toLocaleString()} ft)`;
+      document.getElementById('routeStartLabel').textContent = userLocation.label;
+      document.getElementById('routeStepsContainer').innerHTML = steps.map(s => `
+        <div class="py-1.5 flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2 min-w-0">
+            <span>${s.icon}</span>
+            <span class="text-slate-800 font-medium leading-snug">${s.text}</span>
+          </div>
+          ${s.dist ? `<span class="text-[11px] font-semibold text-slate-400 shrink-0">${s.dist}</span>` : ''}
+        </div>
+      `).join('');
+
+      document.getElementById('routeDrawer').classList.remove('hidden');
+      document.getElementById('clearRouteBtn').classList.remove('hidden');
+      document.getElementById('rightControls').style.bottom = '255px';
+
+      if (fitBounds) {
+        map.fitBounds(mainPolyline.getBounds(), {
+          paddingTopLeft: [45, 145],
+          paddingBottomRight: [45, 265],
+          maxZoom: 2.0
+        });
+      }
+    }
+
+    /**
+     * ============================================================================
+     * 11. MODAL & UTILITY HELPERS
+     * ============================================================================
+     */
+    function openSimulateModal() {
+      document.getElementById('simulateModal').classList.remove('hidden');
+    }
+    function closeSimulateModal() {
+      document.getElementById('simulateModal').classList.add('hidden');
+    }
+    function openLegendModal() {
+      document.getElementById('legendModal').classList.remove('hidden');
+    }
+    function closeLegendModal() {
+      document.getElementById('legendModal').classList.add('hidden');
+    }
+    function openOffCampusModal() {
+      document.getElementById('offCampusModal').classList.remove('hidden');
+    }
+    function closeOffCampusModal() {
+      document.getElementById('offCampusModal').classList.add('hidden');
+    }
+
+    let toastTimeout = null;
+    function showToast(msg) {
+      const el = document.getElementById('toastBanner');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => el.classList.add('hidden'), 2600);
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    }
+  </script>
 </body>
 </html>
-```[cite: 1, 2]
